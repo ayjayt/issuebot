@@ -11,7 +11,7 @@ Using https://godoc.org/github.com/shomali11/slacker (recommended by Sasha), I�
 ### Example in CLI:
 
 ```
-$: TOKEN=1283myslacktoken10293 ./issuebot --org=gravitational --auth=./userlist
+$: ./issuebot --org=gravitational --auth=./userlist --slack-token=SLACK_TOKEN --github-token=GITHUB_TOKEN
 ...connecting to slack… success
 ...pinging github api… success
 ...looking for userlist… success
