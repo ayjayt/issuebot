@@ -2,9 +2,9 @@
 
 Issuebot is a slackbot that allows creating new github issues with a command
 
-# Preliminary Design
+# Preliminary Design Summary
 
-## Summary:
+## Objective
 
 Using https://godoc.org/github.com/shomali11/slacker (recommended by Sasha), I’m writing a Golang process that functions as a slackbot to post new github issues. The slackbot will listen for mentions (or private messages) and take a command and two string parameters in slack. The first string parameter is a repository, the second string parameter is text. This will become a new github issue, and the bot will reply with link or failure. When starting the process, specify a slack key, a github organization or user, and a newline-delimited list of authorized slack users.
 
@@ -46,4 +46,6 @@ Failure: Network error | No/Bad Repo | etc
 
 It’ll have an init for the flags, and an interface/structure to manage the slack cnx with a single goroutine that verifies user input and pushes commands+meta data onto a queue (a buffered channel probably). A github interface (I’m open to suggestions here) with another goroutine listening on the channel then tries to feed the issue into github and pushes a response+meta data back to (another?) slack goroutine through a buffered channel.
 
+## Misc
 
+[Gravitational Issue Template](https://github.com/gravitational/teleport/blob/master/docs/ISSUE_TEMPLATE.md)
