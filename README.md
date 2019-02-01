@@ -40,11 +40,8 @@ Failure: Network error | No/Bad Repo | etc
 
 ## Basic Architecture:
 
-![Diagram Described Below](./doc/diag1.png "Basic Diagram")
-
-*NB: The interfaces can deadlock if they're both trying to send on full channels instead of one emptying its receive channel, so two coprocesses (two for both slack and github section) makes sense if possible unless it can be ordered properly*
-
-It’ll have an init for the flags, and an interface/structure to manage the slack cnx with a single goroutine that verifies user input and pushes commands+meta data onto a queue (a buffered channel probably). A github interface (I’m open to suggestions here) with another goroutine listening on the channel then tries to feed the issue into github and pushes a response+meta data back to (another?) slack goroutine through a buffered channel.
+The program will be a simple loop (after an init) that listens on slack and then dispatches to linux. The slack uses a callback like structure, so hopefully this is asynchronous.
+You can see the *PROJECT_MANAGEMENT.md* file for more information about the approach- a lot of it is specific to the api's being used.
 
 ## Misc
 
