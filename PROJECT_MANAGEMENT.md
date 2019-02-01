@@ -6,7 +6,7 @@
 | Task | Time Estimate | Status |
 | -------------:|:-------------:| ----:|
 | Early research | -- | Done @ 2:00 |
-| PM timing | 30 min | Done @ 0:35 min |
+| PM timing | 30 min | Done @ 0:35 |
 | Look at commenting documentation | 30 min max | Pending |
 | Look at slack documentation (the one Sasha recommend shama11?) | 30 min max | Pending |
 | Look at github docs (google repo) | 30 min max | Pending |
@@ -29,9 +29,13 @@
 | Write fuzzers for internal functions | SKIP for PoC |  Pending |
 | Total | 13:05 Estimated | 2:35 Completed |
 
+Comment as you go along in godoc-friendly style
+
+Unit tests as you go along to not double up on debugging/unit testing
+
 # Things we're not doing:
 
 
-* I like putting API's/interfaces into their own corners but here it's all in one loop. I like doing that because it ensures all api's are agnostic to other api's. The key here would be creating a datastructure that represents a command/info and writing shims that translate that datastructure for w/e API is writing it/reading it
+* I like putting APIs/interfaces into their own corners but here it's all in one loop. I like doing that because it ensures all APIs are agnostic to other APIs. The key here would be creating a datastructure that represents a command/info and writing shims that translate that datastructure for w/e API is writing it/reading it.
 * The auth is based on a list and that is really inflexible- the slack API would be better served to allow the user to write a custom function as the "validator" function that takes relevant parameters (use info, command requested, w/e) and returns a bool: true (user is authed for this operation) or false.
-* There is pretty poor error reporting/observability, not that it's really important for such a small app but it helps to put thought into what you're going to do to make it convenient to fix, so I'd put thought there
+* There is pretty poor error reporting/observability, not that it's really important for such a small app but it helps to put thought into what you're going to do to make it convenient to fix, so I'd put thought there.
