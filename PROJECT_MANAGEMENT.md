@@ -7,7 +7,7 @@
 | -------------:|:-------------:| ----:|
 | Early research | -- | Done @ 2:00 |
 | PM timing | 30 min | Done @ 0:35 |
-| Look at commenting documentation | 30 min max | Pending |
+| Look at commenting documentation | 30 min max | Done @ 0:20 |
 | Look at slack documentation (the one Sasha recommend shama11?) | 30 min max | Pending |
 | Look at github docs (google repo) | 30 min max | Pending |
 | Look at x/oauth (apparently both slack and github use oauth) | 45 min budgeted | Pending |
@@ -27,7 +27,7 @@
 | Write success unittest for internal functions | 1 hr | Pending |
 | Write common error unittests for internal functions | SKIP for PoC | Pending |
 | Write fuzzers for internal functions | SKIP for PoC |  Pending |
-| Total | 13:05 Estimated | 2:35 Completed |
+| Total | 8:35 Left | 2:55 Completed |
 
 Comment as you go along in godoc-friendly style
 
