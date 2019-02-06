@@ -8,14 +8,14 @@
 | Early research | -- | Done @ 2:00 |
 | PM timing | 30 min | Done @ 0:35 |
 | Look at commenting documentation | 30 min max | Done @ 0:20 |
-| Look at slack documentation (the one Sasha recommend shama11?) | 30 min max | Pending |
-| Look at github docs (google repo) | 30 min max | Pending |
-| Look at x/oauth (apparently both slack and github use oauth) | 45 min budgeted | Pending |
-| Set up a development/testing environment | 30 min budgeted | Pending |
-| Set up dep manager (vgo? godep? go mod? whatever is easier) | 45 min budgeted | Pending |
-| Catch signals to set a healthy exit | 10 min | Pending |
-| Set up flag module to take in flags | 15 min | Pending |
-| Error checking on flags/sanitizing/sanity check | Basics only, 15 min | Pending |
+| Look at slack documentation (the one Sasha recommend shama11?) | 30 min max | Done @ 0:37 |
+| Look at github docs (google repo) | 30 min max | Done @ 0:23 |
+| Look at x/oauth (apparently both slack and github use oauth) | 45 min budgeted | Done @ 0:00 |
+| Set up a development/testing environment | 30 min budgeted | Done @ 1:01 |
+| Set up dep manager (vgo? godep? go mod? whatever is easier) | 45 min budgeted | Done @ 0:00 |
+| Catch signals to set a healthy exit | 10 min | Done @ 0:24 |
+| Set up flag module to take in flags | 15 min | Done @ 0:30 |
+| Error checking on flags/sanitizing/sanity check | Basics only, 15 min | Done @ 0:00 |
 | Input file to array for user auth | 25 min | Pending |
 | Write function to sanity test slack connection | 45 min | Pending |
 | Write function to sanity test github conneciton + org validity | 45 min | Pending |

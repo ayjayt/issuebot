@@ -1,6 +1,51 @@
 # issuebot
 
-Issuebot is a slackbot that allows creating new github issues with a command
+**issuebot** is a slackbot that allows creating new github issues with a command
+
+# Building
+
+_Hint: `git clone` this repo to your `$GOPATH/src` directory; `go help gopath` and `go help importpath` for more info`_
+
+Make commands (may be more in _Makefile_): 
+
+`make build (default)`  
+Outputs binary to _./build/_
+
+`make tidy`  
+Runs `gofmt` and `govet` on files specified in Makefile's _FILE_ variable
+
+`make test`  
+Runs `go test` as expected
+
+`make clean`  
+Clears _./build/_ directory
+
+
+## Dependencies
+
+This is a list of 3rd party dependencies, which you can load with `go get` or migrate to your organization's dep management system.
+
+[github.com/shomali11/slacker](https://github.com/shomali11/slacker)  
+A simple library that allows you to create slackbots by registering a command string and a callback
+
+[github.com/shurcooL/githubv4](https://github.com/shomali11/slacker)  
+An extensive library that creates a go interfaces for the GitHub APIv4 (graphQL)
+
+[golang.org/x/oauth2](https://godoc.org/golang.org/x/oauth2)  
+The oauth library used by githubv4 for auth
+
+# After Building: Configure and Run
+
+* Create a slack token (refer to slack docs)
+* Create a github token (refer to github docs)  
+_NB: as of Feb 2019, this can be the personal or the "oauth"- effectively the same (oath), but "oath" registers your "app"_
+* Create two files with just the tokens (or override w/ flag-- see below):
+  * slack_token
+  * github_token
+* Create a file and list slack users (**BY WHAT**), each on a new line, who can use the issuebot. This will be specified on the command line.
+* Run the program (see below for normal flags or use --help)  in ./build and it will do it's best to connect
+
+# Using with Slack
 
 # Preliminary Design Summary
 
