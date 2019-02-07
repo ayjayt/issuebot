@@ -44,9 +44,6 @@ The logger used by this programmer
 [gopkg.in/check.v1](https://gopkg.in/check.v1)  
 A testing suite to enhance Go's native "testing" module
 
-[github.com/ayjayt/crashtest](https://github.com/ayjayt/crashtest)
-A helper library to catch functions that panic or exit and test for error codes
-
 ## After Building: Configure and Run
 
 * Create a slack token (refer to slack docs)

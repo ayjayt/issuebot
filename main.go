@@ -12,46 +12,42 @@ import (
 // running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start (important) network op
 var running = true
 
+func init() {
+	// Load a logger- load more later if you want them- some might depend on flags.
+	console, _ := log.NewLogger(log.Config{"console", "debug"}) // note: debug, info, warning, error
+	log.Init(console)
+}
 
 // main is being used here kind of like a forward declaration- it's the outline of the program.
 // I don't use init because I can't control execution order and so test can't use env variables
 func main() {
 
-	// Load a logger- load more later if you want them- some might depend on flags.
-	console, _ := log.NewLogger(log.Config{"console", "debug"}) // note: debug, info, warning, error
-	log.Init(console)
+	// This is so that we wait for callbacks to finish if we're exiting cleanly
+	var waitForCb sync.WaitGroup
+	// Note: use waitForCb.Add(1) to count an ongoing op and waitForCb.Done() to finish
 
-	// Be able to turn off flags and verification... these will be called manually
-	if os.Getenv("ISSUEBOT_FLAGS") != "NO" {
-		flagInit() // in flags.go
-	}
-
-	// Be able to turn testing and flags off for unit testing- console is fine, obviously
-	if os.Getenv("ISSUEBOT_LOGS") != "NO" {
-		// No other logging enabled (slack logging ?)
+	if err := flagInit(); err != nil {
+		log.Errorf("Program couldn't start: %v", err)
+		os.Exit(1)
 	}
 
 	// TODO: Init github and test
 	// TODO: Init slack with function and callback
 
-	// run will wait for a signal 
+	// run will wait for a signal
 	run()
 
+	waitForCb.Wait()
 }
 
 // run sets up both apis with the proper definitions, and then it waits for signals
 func run() {
-
 
 	// This is all for catching signals
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt)
 	timeNow := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
 	log.Infof("Issuebot booted for org %v", *flag_org)
-
-	// This is so that we wait for callbacks to finish if we're exiting cleanly
-	var waitForCb sync.WaitGroup
-	// Note: use waitForCb.Add(1) to count an ongoing op and waitForCb.Done() to finish
 
 	// Now we're going to wait on signals from terminal
 	for signalRecvd := range signalChannel {
@@ -68,7 +64,6 @@ func run() {
 		log.Infof("Send again <1 second to exit cleanly")
 	}
 
-	waitForCb.Wait()
 }
 
 // TODO: Refactor this todo list
