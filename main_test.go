@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 	//"fmt"
+	catch "github.com/ayjayt/crashtest"
 	. "gopkg.in/check.v1" // not sure why we went this route (with .) but I'm taking hints from gravitational/hello
 )
 

@@ -25,6 +25,8 @@ Clears _./build/_ directory
 
 This is a list of 3rd party dependencies, which you can load with `go get` or migrate manually to your organization's dependency management system.
 
+#### Run
+
 [github.com/shomali11/slacker](https://github.com/shomali11/slacker)  
 A simple library that allows you to create slackbots by registering a command string and a callback
 
@@ -37,8 +39,13 @@ The oauth library used by GitHub APIv4 for auth
 [github.com/mailgun/log](https://github.com/mailgun/log)  
 The logger used by this programmer
 
+#### Test
+
 [gopkg.in/check.v1](https://gopkg.in/check.v1)  
 A testing suite to enhance Go's native "testing" module
+
+[github.com/ayjayt/crashtest](https://github.com/ayjayt/crashtest)
+A helper library to catch functions that panic or exit and test for error codes
 
 ## After Building: Configure and Run
 
