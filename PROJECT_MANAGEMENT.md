@@ -16,7 +16,7 @@
 | Catch signals to set a healthy exit | 10 min | Done @ 0:24 |
 | Set up flag module to take in flags | 15 min | Done @ 0:30 |
 | Error checking on flags/sanitizing/sanity check | Basics only, 15 min | Done @ 0:00 |
-| Input file to array for user auth | 25 min | Pending |
+| Input file to array for user auth | 25 min | Done @ 0:41 |
 | Write function to sanity test slack connection | 45 min | Pending |
 | Write function to sanity test github conneciton + org validity | 45 min | Pending |
 | Set up retry function so we can reconnect after init | 30 min | Pending |
@@ -24,10 +24,10 @@
 | Write callback to get info from slack (and print to log) | 30 min | Pending |
 | Write function to get issue onto github w/ proper returns | 1 hr | Pending |
 | Write function to respond to slack |  30 min | Pending |
-| Write success unittest for internal functions | 1 hr | Pending |
-| Write common error unittests for internal functions | SKIP for PoC | Pending |
+| Write success unittest for internal functions | 1 hr | Pending @ 3:00 |
+| Write common error unittests for internal functions | SKIP for PoC | Rolled into success w/ unit test tables |
 | Write fuzzers for internal functions | SKIP for PoC |  Pending |
-| Total | 8:35 Left | 2:55 Completed |
+| Total | 4:00 Left | 9:30 Completed |
 
 Comment as you go along in godoc-friendly style
 
