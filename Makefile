@@ -1,4 +1,4 @@
-.PHONY: build tidy clean
+.PHONY: build tidy clean test
 
 build:
 	@echo "make build:"
@@ -8,8 +8,12 @@ clean:
 	@echo "make clean:"
 	-rm -r build/*
 
+test:
+	@echo "make test (expand this w/ hello):"
+	go test
+
 # Add files here that you want to be checked before building w/ tools in "tidy" target below
-FILES := main.go 
+FILES := main.go main_test.go
 
 tidy:$(FILES)
 	gofmt -w $?
