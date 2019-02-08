@@ -9,11 +9,11 @@ import (
 	"time"
 )
 
-// Var running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start (important) network op
+// Var running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start important network ops
 var running = true
 
-// intest lets the supervisor (run) know whether or not to exit
-var intest = false
+// Var inTest lets the supervisor (run) know whether or not to exit
+var inTest = false
 
 // Func init() prepares a console logger
 func init() {
@@ -27,13 +27,13 @@ func init() {
 }
 
 // main is being used here kind of like a forward declaration- it's the outline of the program.
-// I don't use init because I can't control execution order and so test can't use env variables
+// I don't use init because I can't control execution order disallowing test from using env variables
 func main() {
 
 	var err error
 
 	// Read flags
-	if err := flagInit(); err != nil {
+	if err := flagInit(); err != nil { // flags.go
 		log.Errorf("Program couldn't start: %v", err)
 		os.Exit(1)
 	}
@@ -46,6 +46,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Start github bot
 	githubBot := NewGitHubIssueBot(githubToken) // github.go
 	githubBot.Connect()
 	if ok, _ := githubBot.CheckOrg(*flagOrg); !ok {
@@ -67,15 +68,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start github bot
+	// WaitGroup so that callbacks can finish before run exits when told to
 	var waitForCb sync.WaitGroup
 
-	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up, and then os.Exit(0)
+	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up (WaitGroup), and then os.Exit(0)
 	go run(waitForCb)
 
-	// the slackbot library is both block and unsupportive of concurrency
+	// The slackbot library is both blocking and unsupportive of concurrency
+	log.Infof("Issuebot booted for org %v", *flagOrg)
 	err = openBot(slackToken, authedUsers, waitForCb, githubBot)
-
 	if err != nil {
 		log.Errorf("Some problem starting the Slack bot: %v", err)
 		os.Exit(1)
@@ -83,14 +84,13 @@ func main() {
 
 }
 
-// run sets up both apis with the proper definitions, and then it waits for signals
+// run waits for signals to exit or reload information
 func run(waitForCb sync.WaitGroup) {
 
 	// This is all for catching signals
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt)
 	timeNow := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-	log.Infof("Issuebot booted for org %v", *flagOrg)
 
 	// Now we're going to wait on signals from terminal
 	for signalRecvd := range signalChannel {
@@ -110,14 +110,15 @@ func run(waitForCb sync.WaitGroup) {
 		log.Infof("Send again <1 second to exit cleanly")
 	}
 
+	// Don't exit until done- this should be timed-out
 	waitForCb.Wait()
 
-	if !intest {
+	if !inTest {
 		os.Exit(0) // Not really happy about this
 	}
 }
 
-// TODO: Refactor this todo list
+// TODO: Refactor this "future" todo list
 // TODO: Issue log would be cool on custom response to log channel
 // TODO: It would be cool if you could use a particular user's github credentials from slack but that's a part of a custom auth feature
 // TODO: Could use oauth but oauth reg on github was requiring a larger-scoped registration process (website, etc)- the super benefit of this is that it restrict users to repos they have access to, which would eliminate some of the problems with github's over-scoped token situation (below). This would also allow us to use the suggest log channel as a way to communicate with issues.

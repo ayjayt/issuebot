@@ -33,7 +33,7 @@ func NewGitHubIssueBot(token string) (bot *GitHubIssueBot) {
 
 // GetOrg() is a getter for the registered org
 func (g *GitHubIssueBot) GetOrg() (org string) {
-	return org
+	return g.org
 }
 
 // CheckOrg sanity checks that we can access the organization passed as a parameter. How do I feel about v4? I dont' know.
@@ -45,7 +45,7 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 
 	var name string
 
-	var queryUser struct { // TODO: user search + type, not User/Org
+	var queryUser struct { // TODO: use Search object + type, not User/Org object
 		User struct {
 			Name string
 		} `graphql:"user(login: $org)"`
@@ -56,8 +56,9 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 			Name string
 		} `graphql:"organization(login: $org)"`
 	}
-	// BUG(AJ) So hacky I'll call it a bug. Infact, error handling throughout everything here is crap. Not sure if teams can own repos either.
+	// BUG(AJ) So hacky I'll call it a bug. ^^ refer to TODO above
 
+	// Basically, since graphql errors are "hard" to interrupt, we're just going to try and find the orgname first under users then under organizations
 	err = g.client.Query(context.Background(), &queryUser, variables)
 	if err != nil {
 		err = g.client.Query(context.Background(), &queryOrg, variables)
@@ -71,6 +72,7 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 		log.Errorf("Error in CheckOrg() couldn't access supplied org: %T: %v", err, err) // BUG(AJ) GitHub is kicking back the auth token sometimes, e.g. LOG: -LEGIT TOKEN-\n
 		return false, err
 	}
+
 	log.Debugf("Display Name of %v: %v", org, name)
 	g.org = org
 	return true, nil
@@ -84,6 +86,7 @@ func (g *GitHubIssueBot) NewIssue(repo string, title string, body string) (URL s
 		"repo": githubv4.String(repo),
 	}
 
+	// We need to see if the repo exists first. Search would still be better.
 	var query struct {
 		Repository struct {
 			ID githubv4.ID
@@ -97,6 +100,7 @@ func (g *GitHubIssueBot) NewIssue(repo string, title string, body string) (URL s
 		return "", err
 	}
 
+	// Preparing some types for a "mutate" query
 	type CreateIssueInput struct {
 		Title            githubv4.String  `json:"title"`
 		Body             githubv4.String  `json:"body"`
@@ -122,6 +126,7 @@ func (g *GitHubIssueBot) NewIssue(repo string, title string, body string) (URL s
 		log.Errorf("Error in NewIssue() on mutate: %T: %v", err, err)
 		return "", err
 	}
+
 	return string(m.CreateIssue.Issue.Url), nil
 
 	// TODO: so much other stuff that should go along with posting the issue- assigning it, etc

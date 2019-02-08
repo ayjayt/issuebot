@@ -19,7 +19,7 @@ type MainSuite struct{}
 var _ = Suite(&MainSuite{})
 
 func init() {
-	intest = true
+	inTest = true
 }
 
 func (s *MainSuite) SetUpSuite(c *C) {
@@ -34,20 +34,21 @@ func (s *MainSuite) TearDownTest(C *C) {
 	running = true
 }
 
-// TestProcessFlow just looks to make sure that signals are working properly
-// It's a unique test in that it's not a fn(param...) = return type structure
+// TestRun looks to make sure that signals are working properly
+// It's a unique test in that it's not a "fn(param...) = return" type testing structure
 func (s *MainSuite) TestRun(c *C) {
 	// TODO: race tests
 	if runtime.GOOS == "windows" { // TODO: Check, really- see BUG below
-		fmt.Println("You are running on windows. There is a bug that may or may not exist preventing it from running correctly. Please either delete this if block if the test works, or uncomment the line below this print statement if the test does not and submit a pull request or raise an issue.")
+		fmt.Println("You are running on windows. There is a bug that may or may not exist preventing it from running correctly. Please either delete this if-block if the test works, or uncomment the skip below if the test does not and submit a pull request or raise an issue.")
 		// c.Skip("Test doesn't work on windows")
 	}
 
-	// Because we can't loop through a table
+	// Factory for custom comments based on stage
 	comment := func(stage string) CommentInterface {
-		return Commentf("Run test showed running to be %v when it should be %v %v.", running, !running, stage) // just figured that these variables would be evaluated once when Commentf was called
+		return Commentf("Run test showed running to be %v when it should be %v %v.", running, !running, stage)
 	}
 
+	// Return my PID
 	me, err := os.FindProcess(os.Getpid())
 	if err != nil {
 		c.Errorf("Test itself is failing: %v", err)
@@ -57,8 +58,10 @@ func (s *MainSuite) TestRun(c *C) {
 	// Marking the stage
 	c.Assert(running, Equals, true, comment("before running"))
 
+	// Set a timeout
 	timeout := time.NewTimer(3 * time.Second)
 	blockChan := make(chan int)
+	// WaitGroup could probably be used instead of blockChan somehow
 	var wg sync.WaitGroup
 	go func() {
 		blockChan <- 1
@@ -72,10 +75,12 @@ func (s *MainSuite) TestRun(c *C) {
 	// BUG(AJ): This os.Process.Signal(os.Interrupt) wont work on windows? https://github.com/golang/go/issues/6720
 	// It seems that only the test is affected. ^C is interpreted correctly as os.Interrupt when _listening_, but sending os.Interrupt does != ^C on windows
 
+	// First interrupt- reload
 	me.Signal(os.Interrupt)
 	time.Sleep(200 * time.Millisecond) // Signal takes time. Think of 200 ms like a timeout.
 	c.Assert(running, Equals, true, comment("after one signal"))
 
+	// Second interrupt- exit run()
 	me.Signal(os.Interrupt)
 	time.Sleep(200 * time.Millisecond) // Signal takes time. Think of 200 ms like a timeout.
 	c.Assert(running, Equals, false, comment("after a second signal"))
@@ -83,7 +88,7 @@ func (s *MainSuite) TestRun(c *C) {
 	// Timeout or finish?
 	select {
 	case <-blockChan: // this will be closed if run unblocks
-		if timeout.Stop() { // returns true if succesful stops a timer, I guess
+		if timeout.Stop() { // returns true if succesful
 			return
 		}
 	case <-timeout.C: // this will be "actuated" if the timeout expires
