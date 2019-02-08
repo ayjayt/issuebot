@@ -4,26 +4,19 @@
 
 ## Building
 
+There is a list of dependencies below- you can use your own dep manager or just use `go get`
+
 _Hint: `git clone` this repo to your `$GOPATH/src` directory; `go help gopath` and `go help importpath` for more info_
 
-Make commands (there may be more in _Makefile_): 
+### Make commands (more in _Makefile_): 
 
-`make build` 
+`make build`  
 Outputs binary to _./build/_. This is the default make target.
-
-`make tidy`  
-Runs `gofmt` and `govet` on files specified in Makefile's _FILE_ variable
 
 `make test`  
 Runs `go test` as expected
 
-`make clean`  
-Clears _./build/_ directory
-
-
 ### Dependencies
-
-This is a list of 3rd party dependencies, which you can load with `go get` or migrate manually to your organization's dependency management system.
 
 #### Run
 
@@ -53,8 +46,9 @@ _NB: as of Feb 2019, this can be the personal or the "oauth"- effectively the sa
   * slack_token
   * github_token
 * Create a file and list slack users (**BY WHAT**), each on a new line, who can use the issuebot. The default file name is *./userlist* but can be overrided by a flag.
-* Run the program (see below for typical use or use `issuebot --help` to see all flags) in _./build/_ and it will do it's best to connect
+* Run the program (see below for typical use or use `issuebot --help` to see all flags) in _./build/_ and it will do it's best to connect:
+You must specify `--org "org name or user name"` so that IssueBot knows where to find repo's specified by the user.
 
-The benefit of using files for keys and users is that the files can be reloaded by with <kbd>^C</kbd>. Hit <kbd>^C</kbd> twice to exit cleanly.
+The benefit of using files for tokens and users is that the files can be reloaded by with <kbd>^C</kbd>. Hit <kbd>^C</kbd> twice to exit cleanly.
 
 ## Using with Slack

@@ -53,7 +53,7 @@ func main() {
 	slackToken, err = loadSlackToken() // flags.go
 	if err != nil {
 		log.Errorf("Program couldn't load the Slack token: %v", err)
-		os,Exit(1)
+		os.Exit(1)
 	}
 	var authedUsers []string
 	authedUsers, err = loadAuthedUsers() // flags.go TODO append?
@@ -67,7 +67,7 @@ func main() {
 	run()
 
 	// wait until syncgroup is finished- this isn't preventing a panic-inducing race condition, it's just a courtesy to the users.
-	// That is to say, running could be set to false, and no new coroutines will cause a wait, 
+	// That is to say, running could be set to false, and no new coroutines will cause a wait,
 	// I don't think Wait will get called between a coroutine checking running and calling WaitGroup.Add, but theoretically it can
 	// and that mgiht confuse the user
 	waitForCb.Wait()
@@ -78,7 +78,6 @@ func main() {
 	// wait called
 	// Add(1) called
 	// I guess we could check running again?
-
 
 }
 
