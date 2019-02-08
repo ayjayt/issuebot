@@ -24,10 +24,6 @@ func main() {
 
 	var err error
 
-	// This is so that we wait for callbacks to finish if we're exiting cleanly
-	// Note: use waitForCb.Add(1) to count an ongoing op and waitForCb.Done() to finish
-	var waitForCb sync.WaitGroup
-
 	// Read flags
 	if err := flagInit(); err != nil {
 		log.Errorf("Program couldn't start: %v", err)
@@ -41,6 +37,7 @@ func main() {
 		log.Errorf("Program couldn't load the GitHub token: %v", err)
 		os.Exit(1)
 	}
+
 	githubBot := NewGitHubIssueBot(githubToken) // github.go
 	githubBot.Connect()
 	if ok, _ := githubBot.CheckOrg(*flagOrg); !ok {
@@ -55,19 +52,27 @@ func main() {
 		log.Errorf("Program couldn't load the Slack token: %v", err)
 		os.Exit(1)
 	}
-	log.Debugf("slackToken: %v", slackToken)
 	var authedUsers []string
 	authedUsers, err = loadAuthedUsers() // flags.go TODO append?
 	if err != nil {
 		log.Errorf("Program couldn't load the authed users: %v", err)
 		os.Exit(1)
 	}
-	// TODO: Init slack with function and callback
-	_ = slackToken
-	_ = authedUsers
-	// run will wait for a signal (SIGINTish)
-	run()
 
+	// Start github bot
+	var waitForCb sync.WaitGroup
+
+	// run will wait for a signal (SIGINTish)
+	go run()
+
+	err = openBot(slackToken, authedUsers, *flagOrg, waitForCb)
+
+	if err != nil {
+		log.Errorf("Some problem starting the Slack bot: %v", err)
+		os.Exit(1)
+	}
+
+	// BUG(AJ) Concurrency is a headache
 	// wait until syncgroup is finished- this isn't preventing a panic-inducing race condition, it's just a courtesy to the users.
 	// That is to say, running could be set to false, and no new coroutines will cause a wait,
 	// I don't think Wait will get called between a coroutine checking running and calling WaitGroup.Add, but theoretically it can
@@ -98,12 +103,16 @@ func run() {
 		if newTime.Sub(timeNow) < 1000*time.Millisecond {
 			log.Infof("Exiting...")
 			running = false
+			//TODO: actually going to have to cancel openBot
 			break
 		}
 		timeNow = newTime
 		log.Infof("Received a signal: %v", signalRecvd)
 		log.Infof("Reloading auth'ed users and keys")
 		// TODO: reload authed users and keys- don't panic on error
+		// have they changed? no- don't do it
+		// are they there? no- warn
+		// else, redo, restart
 		log.Infof("Send again <1 second to exit cleanly")
 	}
 
@@ -116,3 +125,4 @@ func run() {
 // TODO: the above would change the keyword too
 // TODO: unfortunately, github scopes are _not_ granular. for issues, you get +rw on code, pull reqs, wikis, settings, webhooks, deploy keys. this is a 2yr mega thread on github.com/dear-githu[M#Èb
 // TODO: one way to turn this into an interface would be to create a new bot type that could be initialized with a slack org(s) and github org(s) but I feel like it would just be better to run seperate processes -- although multiple slack orgs and github orgs would be good (although multiple github orgs if users supply their own keys too)
+// TODO: needs timeout on network ops

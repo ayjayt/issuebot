@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"fmt"
 	. "gopkg.in/check.v1" // not sure why we went this route (with .) but I'm taking hints from gravitational/hello
 )
 
@@ -27,9 +26,7 @@ func (s *FlagsSuite) TearDownTest(C *C) {
 	// If you want
 }
 
-// test get authed users
-// test get slack key
-// test get github key
+// TODO: comments
 func (s *FlagsSuite) TestVerifyFlags(c *C) {
 	var nilError error = nil
 	testTables := []struct {
