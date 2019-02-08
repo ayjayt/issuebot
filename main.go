@@ -22,16 +22,30 @@ func init() {
 // I don't use init because I can't control execution order and so test can't use env variables
 func main() {
 
+	var err error
+
 	// This is so that we wait for callbacks to finish if we're exiting cleanly
-	var waitForCb sync.WaitGroup
 	// Note: use waitForCb.Add(1) to count an ongoing op and waitForCb.Done() to finish
+	var waitForCb sync.WaitGroup
 
 	if err := flagInit(); err != nil {
 		log.Errorf("Program couldn't start: %v", err)
 		os.Exit(1)
 	}
 
-	// TODO: Init github and test
+	var gitHubToken string
+	gitHubToken, err = loadGitHubToken()
+	if err != nil {
+		log.Errorf("Program couldn't load the GitHub key: %v", err)
+		os.Exit(1)
+	}
+	gitHubBot := NewGitHubIssueBot(gitHubToken)
+	gitHubBot.Connect()
+	if ok, _ := gitHubBot.CheckOrg(*flag_org); !ok {
+		log.Errorf("Couldn't load or find the org supplied")
+		os.Exit(1)
+	}
+
 	// TODO: Init slack with function and callback
 
 	// run will wait for a signal

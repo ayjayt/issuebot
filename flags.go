@@ -103,30 +103,46 @@ func loadAuthedUsers() (ret []string, err error) {
 	return ret, nil
 }
 
-// loadSlackKey tries to return a slack key (from flag or file)
+// loadSlackTokentries to return a slack key (from flag or file)
 // This function reads from globals (flags)
-func loadSlackKey() (slack string, err error) {
+func loadSlackToken() (slack string, err error) {
 	if *flag_slack_token == "" {
 		slackFileContents, err := ioutil.ReadFile(*flag_slack_token_file)
 		if err != nil {
 			return "", err
 		}
 		slack = string(slackFileContents)
+
+		// BUG(AJ) I just don't like this
+		if strings.HasSuffix(slack, "\r\n") {
+			log.Warningf("Slack Token ends in whitespace, eliminating two characters (\\r\\n)...")
+			slack = strings.TrimSuffix(slack, "\r\n")
+		} else if strings.HasSuffix(slack, "\n") {
+			log.Warningf("Slack Token ends in whitespace, eliminating one character (\\n)...")
+			slack = strings.TrimSuffix(slack, "\n")
+		}
 	} else {
 		slack = *flag_slack_token
 	}
 	return slack, nil
 }
 
-// loadGitHubKey tries to return a github key (from flag or file)
+// loadGitHubToken tries to return a github key (from flag or file)
 // This function reads from globals (flags)
-func loadGitHubKey() (github string, err error) {
+func loadGitHubToken() (github string, err error) {
 	if *flag_github_token == "" {
 		githubFileContents, err := ioutil.ReadFile(*flag_github_token_file)
 		if err != nil {
 			return "", err
 		}
 		github = string(githubFileContents)
+		if strings.HasSuffix(github, "\r\n") {
+			log.Warningf("GitHub Token ends in whitespace, eliminating two characters (\\r\\n)...")
+			github = strings.TrimSuffix(github, "\r\n")
+		} else if strings.HasSuffix(github, "\n") {
+			log.Warningf("GitHub Token ends in whitespace, eliminating one character (\\n)...")
+			github = strings.TrimSuffix(github, "\n")
+		}
 	} else {
 		github = *flag_slack_token
 	}
