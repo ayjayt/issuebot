@@ -72,7 +72,7 @@ func openBot(token string, authedUsers []string, waitForCb sync.WaitGroup, gBot 
 		return func(request slacker.Request, response slacker.ResponseWriter) {
 
 			// running has let us know to stop taking new issues for the moment
-			if !running {
+			if !running { // TODO: good candidate for context
 				response.ReportError(errors.New("Issuebot is starting up or shutting down, try again in a few seconds."))
 				return
 			}
@@ -115,9 +115,20 @@ func openBot(token string, authedUsers []string, waitForCb sync.WaitGroup, gBot 
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	log.Infof("Starting slack bot listen...")
-	err = sBot.Listen(ctx) // TODO: This blocks, so how are we going to turn it off?
+	err = sBot.Listen(ctx) // TODO: This blocks, until cancel, which gets called at the end...
 	log.Infof("bot.Listen(ctx) returned")
 
 	return err
 }
+
+/*
+// Notes:
+lets see if we can listen concurrently again
+lets see what we can do with client
+
+the client.Listen ranges Slacker.rtm.IncomingEvents- looks like we can call ctx.Done() to wrap it up
+it doesn't export the RTM it uses from slack
+so ranging on rtm.IncomingEvents- or slack.RTM.IncomingEvents.. it's a channel
+*/

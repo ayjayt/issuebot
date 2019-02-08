@@ -29,8 +29,12 @@ func init() {
 // main is being used here kind of like a forward declaration- it's the outline of the program.
 // I don't use init because I can't control execution order disallowing test from using env variables
 func main() {
-
+	// WaitGroup so that callbacks can finish before run exits when told to
+	var waitForCb sync.WaitGroup
 	var err error
+	var githubToken string
+	var slackToken string
+	var authedUsers []string
 
 	// Read flags
 	if err := flagInit(); err != nil { // flags.go
@@ -39,7 +43,6 @@ func main() {
 	}
 
 	// Prepare GitHub
-	var githubToken string
 	githubToken, err = loadGitHubToken() // flags.go
 	if err != nil {
 		log.Errorf("Program couldn't load the GitHub token: %v", err)
@@ -55,33 +58,30 @@ func main() {
 	}
 
 	// Prepare Slack
-	var slackToken string
 	slackToken, err = loadSlackToken() // flags.go
 	if err != nil {
 		log.Errorf("Program couldn't load the Slack token: %v", err)
 		os.Exit(1)
 	}
-	var authedUsers []string
 	authedUsers, err = loadAuthedUsers()
 	if err != nil {
 		log.Errorf("Program couldn't load the authed users: %v", err)
 		os.Exit(1)
 	}
 
-	// WaitGroup so that callbacks can finish before run exits when told to
-	var waitForCb sync.WaitGroup
-
 	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up (WaitGroup), and then os.Exit(0)
-	go run(waitForCb)
 
-	// The slackbot library is both blocking and unsupportive of concurrency
-	log.Infof("Issuebot booted for org %v", *flagOrg)
-	err = openBot(slackToken, authedUsers, waitForCb, githubBot)
-	if err != nil {
-		log.Errorf("Some problem starting the Slack bot: %v", err)
-		os.Exit(1)
-	}
+	go func() {
 
+		log.Infof("IssueBot connected for org %v", *flagOrg)
+		err = openBot(slackToken, authedUsers, waitForCb, githubBot)
+		if err != nil {
+			log.Errorf("Some problem starting the Slack bot: %v", err)
+			os.Exit(1)
+		}
+	}()
+
+	run(waitForCb)
 }
 
 // run waits for signals to exit or reload information
@@ -91,7 +91,7 @@ func run(waitForCb sync.WaitGroup) {
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt)
 	timeNow := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-
+	log.Infof("Waitng for signals...")
 	// Now we're going to wait on signals from terminal
 	for signalRecvd := range signalChannel {
 		newTime := time.Now()
