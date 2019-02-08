@@ -98,9 +98,9 @@ func loadAuthedUsers() (ret []string, err error) {
 	}
 	ret = strings.Split(string(authFile), "\r\n")
 	if len(ret) == 1 { // it's possible that different OSes have different newline conventions- don't check \n first
-		ret = strings.Split(string(authFile), "\n")
+		ret = strings.Split(ret[0], string(10)) // this is catching a space?
 	}
-	return ret, nil
+	return ret[:len(ret)-1], nil
 }
 
 // loadSlackTokentries to return a slack key (from flag or file)

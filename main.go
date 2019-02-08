@@ -55,10 +55,11 @@ func main() {
 		log.Errorf("Program couldn't load the Slack token: %v", err)
 		os.Exit(1)
 	}
+	log.Debugf("slackToken: %v", slackToken)
 	var authedUsers []string
 	authedUsers, err = loadAuthedUsers() // flags.go TODO append?
 	if err != nil {
-		log.Errorf("Program couldn't load the Slack token: %v", err)
+		log.Errorf("Program couldn't load the authed users: %v", err)
 		os.Exit(1)
 	}
 	// TODO: Init slack with function and callback
