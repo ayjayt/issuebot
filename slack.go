@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-// processParam because the built-in command processor is extremely weak
+// processParam processes command parameters manualy because the built-in command processor is extremely weak
 func processParam(allParam string) (repo string, title string, body string, ok bool) {
 	// look for three sets of quotes
 	// loop through allParam
@@ -52,7 +52,7 @@ func processParam(allParam string) (repo string, title string, body string, ok b
 	return threeParams[0], threeParams[1], threeParams[2], true
 }
 
-// OpenBot just starts the bot w/ the callback. BUG(AJ) Warning- this bot library doesn't like concurrency. This library is written like we're in node.js.
+// OpenBot just starts the bot with the callback. BUG(AJ) Warning- this bot library doesn't like concurrency. This library is written like we're in node.js.
 func openBot(token string, authedUsers []string, org string, waitForCb sync.WaitGroup) (err error) {
 	var descriptionString strings.Builder
 	descriptionString.WriteString("Creates a new issue on github for ")
@@ -63,18 +63,14 @@ func openBot(token string, authedUsers []string, org string, waitForCb sync.Wait
 	newIssue := &slacker.CommandDefinition{
 		Description: descriptionString.String(),
 		Example:     "new \"repo\" \"issue title\" \"issue body\"",
-
-		// TODO Need custom usage
 		Handler: func(request slacker.Request, response slacker.ResponseWriter) {
-			// This is so that we wait for callbacks to finish if we're exiting cleanly
 			if !running {
 				response.ReportError(errors.New("Issuebot is starting up or shutting down, try again in a few seconds."))
-				// TODO: try to cancel
 				return
 			}
 			waitForCb.Add(1)
 			defer waitForCb.Done()
-			// this supports multiple commands but not "", and I didn't want to override/reimplement the interfaces due to time-cost
+			// Note: This supports multiple commands but not "", and I didn't want to override/reimplement the interfaces due to time-cost
 			allParam := request.StringParam("all", "")
 			repo, title, body, ok := processParam(allParam)
 			if !ok {

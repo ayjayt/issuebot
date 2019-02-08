@@ -1,4 +1,4 @@
-// Package main provides a service-like program, issuebot, that listens to a slack channel and allows users to create new issues on a github repo
+// Command issuebot provides a service-like program, issuebot, that listens to a slack channel and allows users to create new issues on a github repo
 package main
 
 import (
@@ -9,13 +9,18 @@ import (
 	"time"
 )
 
-// running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start (important) network op
+// Var running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start (important) network op
 var running = true
 
+// Func init() prepares a console logger
 func init() {
+	var level string = "debug"
 	// Load a logger- load more later if you want them- some might depend on flags.
-	console, _ := log.NewLogger(log.Config{"console", "debug"}) // note: debug, info, warning, error
+	console, _ := log.NewLogger(log.Config{"console", level}) // note: debug, info, warning, error
 	log.Init(console)
+	if level == "debug" {
+		log.Warningf("Console is currently set to: %v- which is very verbose", level)
+	}
 }
 
 // main is being used here kind of like a forward declaration- it's the outline of the program.
@@ -53,7 +58,7 @@ func main() {
 		os.Exit(1)
 	}
 	var authedUsers []string
-	authedUsers, err = loadAuthedUsers() // flags.go TODO append?
+	authedUsers, err = loadAuthedUsers()
 	if err != nil {
 		log.Errorf("Program couldn't load the authed users: %v", err)
 		os.Exit(1)
@@ -62,9 +67,10 @@ func main() {
 	// Start github bot
 	var waitForCb sync.WaitGroup
 
-	// run will wait for a signal (SIGINTish)
-	go run()
+	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up, and then os.Exit(0)
+	go run(waitForCb)
 
+	// the slackbot library is both block and unsupportive of concurrency
 	err = openBot(slackToken, authedUsers, *flagOrg, waitForCb)
 
 	if err != nil {
@@ -72,24 +78,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// BUG(AJ) Concurrency is a headache
-	// wait until syncgroup is finished- this isn't preventing a panic-inducing race condition, it's just a courtesy to the users.
-	// That is to say, running could be set to false, and no new coroutines will cause a wait,
-	// I don't think Wait will get called between a coroutine checking running and calling WaitGroup.Add, but theoretically it can
-	// and that mgiht confuse the user
-	waitForCb.Wait()
-	// Races:
-	// running checked by coroutine
-	// we need to shutdown new commands here
-	// run set to false
-	// wait called
-	// Add(1) called
-	// I guess we could check running again?
-
 }
 
 // run sets up both apis with the proper definitions, and then it waits for signals
-func run() {
+func run(waitForCb sync.WaitGroup) {
 
 	// This is all for catching signals
 	signalChannel := make(chan os.Signal, 1)
@@ -103,7 +95,6 @@ func run() {
 		if newTime.Sub(timeNow) < 1000*time.Millisecond {
 			log.Infof("Exiting...")
 			running = false
-			//TODO: actually going to have to cancel openBot
 			break
 		}
 		timeNow = newTime
@@ -116,6 +107,9 @@ func run() {
 		log.Infof("Send again <1 second to exit cleanly")
 	}
 
+	waitForCb.Wait()
+
+	os.Exit(0) // Not really happy about this
 }
 
 // TODO: Refactor this todo list
@@ -126,3 +120,4 @@ func run() {
 // TODO: unfortunately, github scopes are _not_ granular. for issues, you get +rw on code, pull reqs, wikis, settings, webhooks, deploy keys. this is a 2yr mega thread on github.com/dear-githu[M#Èb
 // TODO: one way to turn this into an interface would be to create a new bot type that could be initialized with a slack org(s) and github org(s) but I feel like it would just be better to run seperate processes -- although multiple slack orgs and github orgs would be good (although multiple github orgs if users supply their own keys too)
 // TODO: needs timeout on network ops
+// TODO: there needs to be better than using a global to send signals
