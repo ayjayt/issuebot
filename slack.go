@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/ayjayt/slacker"
 	"github.com/mailgun/log"
-	"github.com/shomali11/slacker"
 	"strings"
 	"sync"
 )
@@ -56,7 +56,7 @@ func processParam(allParam string) (repo string, title string, body string, ok b
 }
 
 // OpenBot just starts the bot with the callback. BUG(AJ) Warning- this bot library doesn't like concurrency. This library is written like we're in node.js.
-func openBot(token string, authedUsers []string, waitForCb sync.WaitGroup, gBot *GitHubIssueBot) (err error) {
+func openBot(ctx context.Context, token string, authedUsers []string, waitForCb sync.WaitGroup, gBot *GitHubIssueBot) (err error) {
 
 	// Making a dynamic "Description" message for our slackbot
 	var descriptionString strings.Builder
@@ -113,22 +113,9 @@ func openBot(token string, authedUsers []string, waitForCb sync.WaitGroup, gBot 
 	// Reigster command
 	sBot.Command("new <all>", newIssue)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	log.Infof("Starting slack bot listen...")
-	err = sBot.Listen(ctx) // TODO: This blocks, until cancel, which gets called at the end...
+	err = sBot.Listen(ctx)
 	log.Infof("bot.Listen(ctx) returned")
 
 	return err
 }
-
-/*
-// Notes:
-lets see if we can listen concurrently again
-lets see what we can do with client
-
-the client.Listen ranges Slacker.rtm.IncomingEvents- looks like we can call ctx.Done() to wrap it up
-it doesn't export the RTM it uses from slack
-so ranging on rtm.IncomingEvents- or slack.RTM.IncomingEvents.. it's a channel
-*/

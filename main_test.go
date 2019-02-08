@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	. "gopkg.in/check.v1" // not sure why we went this route (with .) but I'm taking hints from gravitational/hello
 	"os"
 	"runtime"
-	"sync"
+
 	"testing"
 	"time"
 )
@@ -17,10 +18,6 @@ func TestIssueBot(t *testing.T) { TestingT(t) }
 type MainSuite struct{}
 
 var _ = Suite(&MainSuite{})
-
-func init() {
-	inTest = true
-}
 
 func (s *MainSuite) SetUpSuite(c *C) {
 	// If you want
@@ -62,10 +59,11 @@ func (s *MainSuite) TestRun(c *C) {
 	timeout := time.NewTimer(3 * time.Second)
 	blockChan := make(chan int)
 	// WaitGroup could probably be used instead of blockChan somehow
-	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
 		blockChan <- 1
-		run(wg)
+		run(ctx)
 		close(blockChan) // close channel to communicate to goroutine that run finished
 	}()
 

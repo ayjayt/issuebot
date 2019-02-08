@@ -22,8 +22,9 @@ Runs `go test` as expected
 
 #### Run
 
-[github.com/shomali11/slacker](https://github.com/shomali11/slacker)  
+[github.com/ayjayt/slacker](https://github.com/shomali11/slacker)  
 A simple library that allows you to create slackbots by registering a command string and a callback
+Note: A simple fixed has been suggested to shomali11- the original author: https://github.com/shomali11/slacker/issues/33
 
 [github.com/shurcooL/githubv4](https://github.com/shomali11/slacker)  
 An extensive library that creates a go interface for the GitHub APIv4 (GraphQL)

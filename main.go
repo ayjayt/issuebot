@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"github.com/mailgun/log"
 	"os"
 	"os/signal"
@@ -10,10 +11,8 @@ import (
 )
 
 // Var running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start important network ops
+// Maybe a good candidate for context
 var running = true
-
-// Var inTest lets the supervisor (run) know whether or not to exit
-var inTest = false
 
 // Func init() prepares a console logger
 func init() {
@@ -70,22 +69,27 @@ func main() {
 	}
 
 	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up (WaitGroup), and then os.Exit(0)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	go func() {
-
 		log.Infof("IssueBot connected for org %v", *flagOrg)
-		err = openBot(slackToken, authedUsers, waitForCb, githubBot)
+		err = openBot(ctx, slackToken, authedUsers, waitForCb, githubBot) // TODO: I really wanna put the WaitGroup+Running in the Context
 		if err != nil {
-			log.Errorf("Some problem starting the Slack bot: %v", err)
+			log.Errorf("Some problem starting the Slack bot: %T: %v", err, err)
 			os.Exit(1)
 		}
 	}()
 
-	run(waitForCb)
+	run(ctx)
+
+	// Don't exit until done- this should be timed-out
+	waitForCb.Wait()
+	cancel()
 }
 
 // run waits for signals to exit or reload information
-func run(waitForCb sync.WaitGroup) {
+func run(ctx context.Context) {
 
 	// This is all for catching signals
 	signalChannel := make(chan os.Signal, 1)
@@ -93,29 +97,28 @@ func run(waitForCb sync.WaitGroup) {
 	timeNow := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
 	log.Infof("Waitng for signals...")
 	// Now we're going to wait on signals from terminal
-	for signalRecvd := range signalChannel {
-		newTime := time.Now()
-		if newTime.Sub(timeNow) < 1000*time.Millisecond {
-			log.Infof("Exiting...")
-			running = false
+	for {
+		select {
+		case signalRecvd := <-signalChannel:
+			newTime := time.Now()
+			if newTime.Sub(timeNow) < 1000*time.Millisecond {
+				log.Infof("Exiting...")
+				running = false
+				return
+			}
+			timeNow = newTime
+			log.Infof("Received a signal: %v", signalRecvd)
+			log.Infof("Reloading auth'ed users and keys")
+			// TODO: reload authed users and keys- don't panic on error
+			// have they changed? no- don't do it
+			// are they there? no- warn
+			// else, redo, restart
+			log.Infof("Send again <1 second to exit cleanly")
+		case <-ctx.Done():
 			break
 		}
-		timeNow = newTime
-		log.Infof("Received a signal: %v", signalRecvd)
-		log.Infof("Reloading auth'ed users and keys")
-		// TODO: reload authed users and keys- don't panic on error
-		// have they changed? no- don't do it
-		// are they there? no- warn
-		// else, redo, restart
-		log.Infof("Send again <1 second to exit cleanly")
 	}
 
-	// Don't exit until done- this should be timed-out
-	waitForCb.Wait()
-
-	if !inTest {
-		os.Exit(0) // Not really happy about this
-	}
 }
 
 // TODO: Refactor this "future" todo list
