@@ -35,15 +35,15 @@ func main() {
 	}
 
 	// Prepare GitHub
-	var gitHubToken string
-	gitHubToken, err = loadGitHubToken() // flags.go
+	var githubToken string
+	githubToken, err = loadGitHubToken() // flags.go
 	if err != nil {
 		log.Errorf("Program couldn't load the GitHub token: %v", err)
 		os.Exit(1)
 	}
-	gitHubBot := NewGitHubIssueBot(gitHubToken) // github.go
-	gitHubBot.Connect()
-	if ok, _ := gitHubBot.CheckOrg(*flag_org); !ok {
+	githubBot := NewGitHubIssueBot(githubToken) // github.go
+	githubBot.Connect()
+	if ok, _ := githubBot.CheckOrg(*flagOrg); !ok {
 		log.Errorf("Couldn't load or find the org supplied")
 		os.Exit(1)
 	}
@@ -62,7 +62,8 @@ func main() {
 		os.Exit(1)
 	}
 	// TODO: Init slack with function and callback
-
+	_ = slackToken
+	_ = authedUsers
 	// run will wait for a signal (SIGINTish)
 	run()
 
@@ -88,7 +89,7 @@ func run() {
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt)
 	timeNow := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-	log.Infof("Issuebot booted for org %v", *flag_org)
+	log.Infof("Issuebot booted for org %v", *flagOrg)
 
 	// Now we're going to wait on signals from terminal
 	for signalRecvd := range signalChannel {

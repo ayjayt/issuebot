@@ -13,7 +13,7 @@ var (
 	errNoOrg = errors.New("Either user doesn't have access or org doesn't exist")
 )
 
-// GithubIssuebot is a helper type so we can initialize and call common functions easily
+// GitHubIssuebot is a helper type so we can initialize and call common functions easily
 // TODO: can we do to this what gravitational/hello did for Helloer?
 type GitHubIssueBot struct {
 	client     *githubv4.Client
@@ -63,7 +63,7 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 		name = queryUser.User.Name
 	}
 	if err != nil {
-		log.Errorf("Error in CheckOrg() couldn't access supplied org: %T: %v", err, err) // BUG(AJ) Github is kicking back the auth token sometimes, e.g. LOG: -LEGIT TOKEN-\n
+		log.Errorf("Error in CheckOrg() couldn't access supplied org: %T: %v", err, err) // BUG(AJ) GitHub is kicking back the auth token sometimes, e.g. LOG: -LEGIT TOKEN-\n
 		return false, err
 	}
 	log.Debugf("Display Name of %v: %v", org, name)

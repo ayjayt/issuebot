@@ -15,12 +15,12 @@ func (s *FlagsSuite) SetUpSuite(c *C) {
 }
 
 func (s *FlagsSuite) SetUpTest(c *C) {
-	flag_org = nil
-	flag_auth = nil
-	flag_slack_token = nil
-	flag_slack_token_file = nil
-	flag_github_token = nil
-	flag_github_token_file = nil
+	flagOrg = nil
+	flagAuth = nil
+	flagSlackToken = nil
+	flagSlackTokenFile = nil
+	flagGitHubToken = nil
+	flagGitHubTokenFile = nil
 }
 
 func (s *FlagsSuite) TearDownTest(C *C) {
@@ -45,7 +45,7 @@ func (s *FlagsSuite) TestVerifyFlags(c *C) {
 		{name: "All Errors", org: "", auth: "fake-auth-filename", slack_token: "fake-slack-token", slack_token_file: "fake-test-slack-filename", github_token: "fake-test-github-token", github_token_file: "fake-github-filename", expected: ErrBadFlag},
 		{name: "No Org", org: "", auth: "fake-auth-filename", slack_token: "fake-slack-token", slack_token_file: "", github_token: "fake-test-github-token", github_token_file: "", expected: ErrBadFlag},
 		{name: "All Token Redundancy", org: "fake-org-name", auth: "fake-auth-filename", slack_token: "fake-slack-token", slack_token_file: "fake-test-slack-filename", github_token: "fake-test-github-token", github_token_file: "fake-github-filename", expected: ErrBadFlag},
-		{name: "Github Token Redundancy", org: "fake-org-name", auth: "fake-auth-filename", slack_token: "fake-slack-token", slack_token_file: "", github_token: "fake-test-github-token", github_token_file: "fake-github-filename", expected: ErrBadFlag},
+		{name: "GitHub Token Redundancy", org: "fake-org-name", auth: "fake-auth-filename", slack_token: "fake-slack-token", slack_token_file: "", github_token: "fake-test-github-token", github_token_file: "fake-github-filename", expected: ErrBadFlag},
 		{name: "Slack Token Redundancy", org: "fake-org-name", auth: "fake-auth-filename", slack_token: "fake-slack-token", slack_token_file: "fake-test-slack-filename", github_token: "", github_token_file: "fake-github-filename", expected: ErrBadFlag},
 		{name: "All Defaults", org: "fake-org-name", auth: "", slack_token: "", slack_token_file: "", github_token: "", github_token_file: "", expected: nilError},
 		{name: "Best Use w/ Default Auth", org: "fake-org-name", auth: "", slack_token: "", slack_token_file: "fake-test-slack-filename", github_token: "", github_token_file: "fake-github-filename", expected: nilError},
@@ -56,12 +56,12 @@ func (s *FlagsSuite) TestVerifyFlags(c *C) {
 		// setting up comments to go alog with failures
 		comment := Commentf("test #%d (%v)- too many arguments to print", i+1, testTable.name)
 
-		flag_org = &testTable.org
-		flag_auth = &testTable.auth
-		flag_slack_token = &testTable.slack_token
-		flag_slack_token_file = &testTable.slack_token_file
-		flag_github_token = &testTable.github_token
-		flag_github_token_file = &testTable.github_token_file
+		flagOrg = &testTable.org
+		flagAuth = &testTable.auth
+		flagSlackToken = &testTable.slack_token
+		flagSlackTokenFile = &testTable.slack_token_file
+		flagGitHubToken = &testTable.github_token
+		flagGitHubTokenFile = &testTable.github_token_file
 
 		// running actual test
 		err := verifyFlagsSanity()
@@ -77,7 +77,7 @@ func (s *FlagsSuite) TestReadAuth(c *C) {
 	// check against slice
 	c.Skip("Skipping this to move on, but should come back")
 }
-func (s *FlagsSuite) TestReadGithubToken(c *C) {
+func (s *FlagsSuite) TestReadGitHubToken(c *C) {
 	// create a temporary auth file
 	// create auth flag
 	// check against string
