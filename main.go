@@ -12,6 +12,9 @@ import (
 // Var running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start (important) network op
 var running = true
 
+// intest lets the supervisor (run) know whether or not to exit
+var intest = false
+
 // Func init() prepares a console logger
 func init() {
 	var level string = "debug"
@@ -71,7 +74,7 @@ func main() {
 	go run(waitForCb)
 
 	// the slackbot library is both block and unsupportive of concurrency
-	err = openBot(slackToken, authedUsers, *flagOrg, waitForCb)
+	err = openBot(slackToken, authedUsers, waitForCb, githubBot)
 
 	if err != nil {
 		log.Errorf("Some problem starting the Slack bot: %v", err)
@@ -109,7 +112,9 @@ func run(waitForCb sync.WaitGroup) {
 
 	waitForCb.Wait()
 
-	os.Exit(0) // Not really happy about this
+	if !intest {
+		os.Exit(0) // Not really happy about this
+	}
 }
 
 // TODO: Refactor this todo list

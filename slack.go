@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/mailgun/log"
 	"github.com/shomali11/slacker"
 	"strings"
@@ -27,6 +26,7 @@ func processParam(allParam string) (repo string, title string, body string, ok b
 			return "", "", "", false
 		} else if i == 0 { // first character was a quote
 			quoteSwitch = true
+			start = i + 1
 			log.Debugf("Open the quotes!")
 		} else if (!escape) && (c == '\\') { // we'll escape the next character if we weren't escaped
 			escape = true
@@ -38,7 +38,7 @@ func processParam(allParam string) (repo string, title string, body string, ok b
 			if quoteSwitch { // we were in quotes, now we're out
 				threeParams[paramCount] = allParam[start:i]
 				paramCount += 1
-				log.Debugf("Turn off quotes!")
+				log.Debugf("Turn off quotes! %v", threeParams[paramCount-1])
 			} else { // we are just starting quotes
 				start = i + 1
 				log.Debugf("Turn on quotes!")
@@ -53,17 +53,17 @@ func processParam(allParam string) (repo string, title string, body string, ok b
 }
 
 // OpenBot just starts the bot with the callback. BUG(AJ) Warning- this bot library doesn't like concurrency. This library is written like we're in node.js.
-func openBot(token string, authedUsers []string, org string, waitForCb sync.WaitGroup) (err error) {
+func openBot(token string, authedUsers []string, waitForCb sync.WaitGroup, gBot *GitHubIssueBot) (err error) {
 	var descriptionString strings.Builder
 	descriptionString.WriteString("Creates a new issue on github for ")
-	descriptionString.WriteString(org)
+	descriptionString.WriteString(gBot.GetOrg())
 	descriptionString.WriteString("/YOUR_REPO")
 	_ = authedUsers
-	bot := slacker.NewClient(token)
-	newIssue := &slacker.CommandDefinition{
-		Description: descriptionString.String(),
-		Example:     "new \"repo\" \"issue title\" \"issue body\"",
-		Handler: func(request slacker.Request, response slacker.ResponseWriter) {
+	sBot := slacker.NewClient(token)
+
+	// newCommand is built by a callback factory to attach to a certain waitgroup and GitHubIssueBot
+	newCommand := func(waitForCb sync.WaitGroup, gBot *GitHubIssueBot) func(slacker.Request, slacker.ResponseWriter) {
+		return func(request slacker.Request, response slacker.ResponseWriter) {
 			if !running {
 				response.ReportError(errors.New("Issuebot is starting up or shutting down, try again in a few seconds."))
 				return
@@ -77,18 +77,30 @@ func openBot(token string, authedUsers []string, org string, waitForCb sync.Wait
 				response.ReportError(errors.New("You must specify repo, title, and body for new issue! All in quotes."))
 				return
 			}
-			response.Reply(fmt.Sprintf("You want an issue with a title of: \"%v\" and a body of: \"%v\" on repo: \"%v\"!", title, body, repo))
-			return
-		},
-	}
+			var URL string
+			URL, err = gBot.NewIssue(repo, title, body)
 
-	bot.Command("new <all>", newIssue)
+			if err != nil {
+				response.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) check the logs"))
+				return
+			}
+			response.Reply(URL)
+			return
+		}
+	}(waitForCb, gBot)
+
+	newIssue := &slacker.CommandDefinition{
+		Description: descriptionString.String(),
+		Example:     "new \"repo\" \"issue title\" \"issue body\"",
+		Handler:     newCommand,
+	}
+	sBot.Command("new <all>", newIssue)
 
 	// TODO: is this how you turn it off?
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	log.Infof("Starting slack bot listen...")
-	err = bot.Listen(ctx) // TODO: This blocks, so how are we going to turn it off?
+	err = sBot.Listen(ctx) // TODO: This blocks, so how are we going to turn it off?
 	log.Infof("bot.Listen(ctx) returned")
 
 	return err

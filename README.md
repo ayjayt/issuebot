@@ -1,6 +1,8 @@
 # issuebot
 
-**issuebot** is a slackbot that allows creating new github issues with a command
+**issuebot** is a slackbot that allows creating new github issues with a command.
+
+NB: It runs under a single user, and you can only have it write to one organization at this time.
 
 ## Building
 
@@ -52,3 +54,19 @@ You must specify `--org "org name or user name"` so that IssueBot knows where to
 The benefit of using files for tokens and users is that the files can be reloaded by with <kbd>^C</kbd>. Hit <kbd>^C</kbd> twice to exit cleanly.
 
 ## Using with Slack
+
+`new "REPO_NAME" "ISSUE_TITLE" "ISSUE_BODY"`
+
+Quotes are required. You can escape quotes with a backslash. (Any character following a backslash is treated as ascii)
+
+**ayjay_t:**  
+@issuebot new "teleport" "Support Platform: Atari" "It won’t compile on Atari due to whatever"
+**issuebot:**  
+Success: https://github.com/nlopes/slack/issues/460  
+
+Or
+
+**ayjay_t:**  
+/msg @issuebot new "issuebot" "Feature Addition" "Need to authenticate with SSO"
+**issuebot:**  
+Failure: Network error | No/Bad Repo | etc  

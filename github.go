@@ -31,6 +31,11 @@ func NewGitHubIssueBot(token string) (bot *GitHubIssueBot) {
 	return bot
 }
 
+// GetOrg() is a getter for the registered org
+func (g *GitHubIssueBot) GetOrg() (org string) {
+	return org
+}
+
 // CheckOrg sanity checks that we can access the organization passed as a parameter. How do I feel about v4? I dont' know.
 func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must paginate, repository
 

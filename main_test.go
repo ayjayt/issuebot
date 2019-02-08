@@ -5,6 +5,7 @@ import (
 	. "gopkg.in/check.v1" // not sure why we went this route (with .) but I'm taking hints from gravitational/hello
 	"os"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 )
@@ -16,6 +17,10 @@ func TestIssueBot(t *testing.T) { TestingT(t) }
 type MainSuite struct{}
 
 var _ = Suite(&MainSuite{})
+
+func init() {
+	intest = true
+}
 
 func (s *MainSuite) SetUpSuite(c *C) {
 	// If you want
@@ -32,7 +37,7 @@ func (s *MainSuite) TearDownTest(C *C) {
 // TestProcessFlow just looks to make sure that signals are working properly
 // It's a unique test in that it's not a fn(param...) = return type structure
 func (s *MainSuite) TestRun(c *C) {
-
+	// TODO: race tests
 	if runtime.GOOS == "windows" { // TODO: Check, really- see BUG below
 		fmt.Println("You are running on windows. There is a bug that may or may not exist preventing it from running correctly. Please either delete this if block if the test works, or uncomment the line below this print statement if the test does not and submit a pull request or raise an issue.")
 		// c.Skip("Test doesn't work on windows")
@@ -54,9 +59,10 @@ func (s *MainSuite) TestRun(c *C) {
 
 	timeout := time.NewTimer(3 * time.Second)
 	blockChan := make(chan int)
+	var wg sync.WaitGroup
 	go func() {
 		blockChan <- 1
-		run()
+		run(wg)
 		close(blockChan) // close channel to communicate to goroutine that run finished
 	}()
 
