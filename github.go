@@ -13,9 +13,8 @@ var (
 	errNoOrg = errors.New("Either user doesn't have access or org doesn't exist")
 )
 
-// GithubIssuebot is a helper type so we can initialize and call common functione easily
-// Not sure it's needed over what githubv4 provides... this will probably need to be an interface
-// TODO: make interface so that we can "dependency inject" for testing
+// GithubIssuebot is a helper type so we can initialize and call common functions easily
+// TODO: can we do to this what gravitational/hello did for Helloer?
 type GitHubIssueBot struct {
 	client     *githubv4.Client
 	httpClient *http.Client
@@ -25,11 +24,10 @@ type GitHubIssueBot struct {
 
 // NewGitHubIssueBot is basically a tiny initializer
 func NewGitHubIssueBot(token string) (bot *GitHubIssueBot) {
-	// Really bothers me that this declares a pointer AND the value it points to
+	// Really bothers me that this declares a pointer AND the value it points to- creates heap
 	bot = &GitHubIssueBot{
 		token: token,
 	}
-	// Implementation wise, I think returning a pointer puts the value on the heap? This is a pretty standard way of go to do things, but I think from an efficiency perspective it makes more sense to create memory for the value (ie the structure) outside this initialize (in main, for example) and you can avoid the garbage collector
 	return bot
 }
 
@@ -42,7 +40,7 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 
 	var name string
 
-	var queryUser struct { // should be search
+	var queryUser struct { // TODO: user search + type, not User/Org
 		User struct {
 			Name string
 		} `graphql:"user(login: $org)"`
@@ -65,7 +63,7 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 		name = queryUser.User.Name
 	}
 	if err != nil {
-		log.Errorf("Error in CheckOrg() couldn't access supplied org: %T: %v", err, err) // BUG(AJ) Github is kicking back the auth token sometimes, e.g. -LEGIT TOKEN-\n
+		log.Errorf("Error in CheckOrg() couldn't access supplied org: %T: %v", err, err) // BUG(AJ) Github is kicking back the auth token sometimes, e.g. LOG: -LEGIT TOKEN-\n
 		return false, err
 	}
 	log.Debugf("Display Name of %v: %v", org, name)
@@ -143,22 +141,19 @@ func (g *GitHubIssueBot) Connect() (err error) {
 	//TODO: What errors should be here?
 }
 
-// accept: application/vnd.github.starfire-preview+json
-
 // SetToken is just a setter for the private token member of the type
 func (g *GitHubIssueBot) SetToken(token string) {
 	g.token = token
 }
 
-// type Transport is the weakest wrapper possible over oauth2.Transport (coincidently,
-// it is also a wrapper for http.Transport) to let us add headers to every
-// http roundtrip.
+// Transport is a oauth2.Transport wrapper (a http.Transport wrapper itself ) enabling us to add headers to all requests.
 type Transport struct {
 	http.RoundTripper
 }
 
 // RoundTrip is a wrapper over oauth2.Transport.RoundTrip.
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// This header is required by github for creating issues
 	req.Header.Add("Accept", `application/vnd.github.starfire-preview+json`)
 	return t.RoundTripper.RoundTrip(req)
 }
@@ -169,11 +164,12 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 // if Transport == nil before calling http.DefaultTransport in http.Client.Do()
 
 /*
-Personal Note: This is without a doubt, the Transport wrap, the wildest thing I've done.
-And the mess that is oauth's Transport wrapper over http's Transport makes my eyes bleed.
-http.Client is a structure with a Transport member of interface-type RoundTripper, meaning it must implement RoundTrip().
-Usually http.Client uses it's http.Transport type as a default.
-oauth2.NewClient returns a http.Client which uses it's own Transport type, which is a structure that a) is a http.RoundTripper,
-but b) also contains the original http.Transport as a `base http.Transport` member which it calls in it's own RoundTrip()
-after doing this weird *http.Request mashup - AJ 2018/02/08
+	Personal Note: This is without a doubt, the Transport wrap, the wildest thing I've done.
+	This is considering how much of a mess the oauth2/http implementation is ("Transport" is a variable name AND a type name)
+	And the mess that is oauth's Transport wrapper over http's Transport makes my eyes bleed.
+	http.Client is a structure with a Transport member of interface-type RoundTripper, meaning it must implement RoundTrip().
+	Usually http.Client uses it's http.Transport type as a default.
+	oauth2.NewClient returns a http.Client which uses it's own Transport type, which is a structure that a) is a http.RoundTripper,
+	but b) also contains the original http.Transport as a `base http.Transport` member which it calls in it's own RoundTrip()
+	after doing this weird *http.Request mashup - AJ 2018/02/08
 */

@@ -28,30 +28,58 @@ func main() {
 	// Note: use waitForCb.Add(1) to count an ongoing op and waitForCb.Done() to finish
 	var waitForCb sync.WaitGroup
 
+	// Read flags
 	if err := flagInit(); err != nil {
 		log.Errorf("Program couldn't start: %v", err)
 		os.Exit(1)
 	}
 
+	// Prepare GitHub
 	var gitHubToken string
-	gitHubToken, err = loadGitHubToken()
+	gitHubToken, err = loadGitHubToken() // flags.go
 	if err != nil {
-		log.Errorf("Program couldn't load the GitHub key: %v", err)
+		log.Errorf("Program couldn't load the GitHub token: %v", err)
 		os.Exit(1)
 	}
-	gitHubBot := NewGitHubIssueBot(gitHubToken)
+	gitHubBot := NewGitHubIssueBot(gitHubToken) // github.go
 	gitHubBot.Connect()
 	if ok, _ := gitHubBot.CheckOrg(*flag_org); !ok {
 		log.Errorf("Couldn't load or find the org supplied")
 		os.Exit(1)
 	}
 
+	// Prepare Slack
+	var slackToken string
+	slackToken, err = loadSlackToken() // flags.go
+	if err != nil {
+		log.Errorf("Program couldn't load the Slack token: %v", err)
+		os,Exit(1)
+	}
+	var authedUsers []string
+	authedUsers, err = loadAuthedUsers() // flags.go TODO append?
+	if err != nil {
+		log.Errorf("Program couldn't load the Slack token: %v", err)
+		os.Exit(1)
+	}
 	// TODO: Init slack with function and callback
 
-	// run will wait for a signal
+	// run will wait for a signal (SIGINTish)
 	run()
 
+	// wait until syncgroup is finished- this isn't preventing a panic-inducing race condition, it's just a courtesy to the users.
+	// That is to say, running could be set to false, and no new coroutines will cause a wait, 
+	// I don't think Wait will get called between a coroutine checking running and calling WaitGroup.Add, but theoretically it can
+	// and that mgiht confuse the user
 	waitForCb.Wait()
+	// Races:
+	// running checked by coroutine
+	// we need to shutdown new commands here
+	// run set to false
+	// wait called
+	// Add(1) called
+	// I guess we could check running again?
+
+
 }
 
 // run sets up both apis with the proper definitions, and then it waits for signals
