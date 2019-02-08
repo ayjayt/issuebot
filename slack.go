@@ -81,7 +81,7 @@ func openBot(token string, authedUsers []string, waitForCb sync.WaitGroup, gBot 
 			URL, err = gBot.NewIssue(repo, title, body)
 
 			if err != nil {
-				response.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) check the logs"))
+				response.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
 				return
 			}
 			response.Reply(URL)
