@@ -3,47 +3,44 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/ayjayt/slacker"
-	"github.com/mailgun/log"
 	"strings"
 	"sync"
+
+	"github.com/ayjayt/slacker"
+	"github.com/gravitational/trace"
+	"github.com/mailgun/log"
 )
 
-// processParam processes command parameters manualy because the built-in command processor is extremely weak
-func processParam(allParam string) (repo string, title string, body string, ok bool) {
-	// look for three sets of quotes
-	// loop through allParam, keeping track of open and closing quotes, and allowing us skip processing one character at a time (escape)
+// parseParam parses the single parameter into 3 because the built-in command parser can't handle whitespace. parseParam just wants to see three phrases in quotations.
+func parseParam(allParam string) (repo string, title string, body string, ok bool) {
+
+	// threeParams is the three phrases
 	var threeParams [3]string
+	// paramCount tracks how many phrases we've found
 	var paramCount int = 0
+	// quoteSwitch tracks if we're inside or outside quotations
 	var quoteSwitch bool = false
+	// escapeSwitch knows if we should process the next character specially or not
 	var escapeSwitch bool = false
 
-	// start is where the last quote started
+	// start is the index where last phrase started
 	var start int = 0
-	log.Debugf("allParam: %v", allParam)
 	for i, c := range allParam {
-		log.Debugf("i, c: %d, %c", i, c)
 		if (i == 0) && (c != '"') { // first character has to be a quote
-			log.Debugf("Bad start to allParam")
 			return "", "", "", false
-		} else if i == 0 { // first character was a quote
+		} else if i == 0 { // first character AND it was a quote
 			quoteSwitch = true
 			start = i + 1
-			log.Debugf("Open the quotes!")
 		} else if (!escapeSwitch) && (c == '\\') { // we'll escape the next character if we weren't escaped
 			escapeSwitch = true
-			log.Debugf("Next character literal")
 		} else if escapeSwitch { // turn off escapeSwitch and move on (we have escaped the current character)
 			escapeSwitch = false
-			log.Debugf("Character was literal")
 		} else if c == '"' { // we've encountered a non-escaped quote
 			if quoteSwitch { // we were in quotes, now we're out
 				threeParams[paramCount] = allParam[start:i]
 				paramCount += 1
-				log.Debugf("Turn off quotes! %v", threeParams[paramCount-1])
 			} else { // we are just starting quotes
 				start = i + 1
-				log.Debugf("Turn on quotes!")
 			}
 			quoteSwitch = !quoteSwitch
 		}
@@ -55,7 +52,7 @@ func processParam(allParam string) (repo string, title string, body string, ok b
 	return threeParams[0], threeParams[1], threeParams[2], true
 }
 
-// OpenBot just starts the bot with the callback. BUG(AJ) Warning- this bot library doesn't like concurrency. This library is written like we're in node.js.
+// openBot just starts the bot with the callback.
 func openBot(ctx context.Context, token string, authedUsers []string, waitForCb sync.WaitGroup, gBot *GitHubIssueBot) (err error) {
 
 	// Making a dynamic "Description" message for our slackbot
@@ -64,7 +61,6 @@ func openBot(ctx context.Context, token string, authedUsers []string, waitForCb 
 	descriptionString.WriteString(gBot.GetOrg())
 	descriptionString.WriteString("/YOUR_REPO")
 
-	// At least it uses a client... TODO: investigate if you can use this to control it concurrently
 	sBot := slacker.NewClient(token)
 
 	// newCommand is built by a callback factory to attach the CB to a certain waitgroup and GitHubIssueBot
@@ -83,7 +79,7 @@ func openBot(ctx context.Context, token string, authedUsers []string, waitForCb 
 
 			// Note: This supports multiple commands but not "", and I didn't want to override/reimplement the interfaces due to time-cost so I implemented a monolothic parameter and parse it myself.
 			allParam := request.StringParam("all", "")
-			repo, title, body, ok := processParam(allParam)
+			repo, title, body, ok := parseParam(allParam)
 
 			// Params were bad
 			if !ok {
@@ -93,7 +89,7 @@ func openBot(ctx context.Context, token string, authedUsers []string, waitForCb 
 
 			// Lets try to create a new issue
 			var URL string
-			URL, err = gBot.NewIssue(repo, title, body)
+			URL, err = gBot.NewIssue(ctx, repo, title, body) // TODO: issue structure instead of three parameters
 			if err != nil {
 				response.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
 				return
@@ -117,5 +113,5 @@ func openBot(ctx context.Context, token string, authedUsers []string, waitForCb 
 	err = sBot.Listen(ctx)
 	log.Infof("bot.Listen(ctx) returned")
 
-	return err
+	return trace.Wrap(err)
 }

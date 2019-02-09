@@ -3,11 +3,13 @@ package main
 
 import (
 	"context"
-	"github.com/mailgun/log"
 	"os"
 	"os/signal"
 	"sync"
 	"time"
+
+	"github.com/gravitational/trace"
+	"github.com/mailgun/log"
 )
 
 // Var running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start important network ops
@@ -16,74 +18,49 @@ var running = true
 
 // Func init() prepares a console logger
 func init() {
-	var level string = "debug"
-	// Load a logger- load more later if you want them- some might depend on flags.
-	console, _ := log.NewLogger(log.Config{"console", level}) // note: debug, info, warning, error
+	// Note: You can load more loggers after this Init.
+	console, _ := log.NewLogger(log.Config{"console", "debug"}) // note: debug, info, warning, error
 	log.Init(console)
-	if level == "debug" {
-		log.Warningf("Console is currently set to: %v- which is very verbose", level)
-	}
 }
 
-// main is being used here kind of like a forward declaration- it's the outline of the program.
-// I don't use init because I can't control execution order disallowing test from using env variables
 func main() {
 	// WaitGroup so that callbacks can finish before run exits when told to
 	var waitForCb sync.WaitGroup
 	var err error
-	var githubToken string
-	var slackToken string
-	var authedUsers []string
 
-	// Read flags
-	if err := flagInit(); err != nil { // flags.go
+	cfg, err := checkAndSetDefaults()
+	if err != nil { // flags.go
 		log.Errorf("Program couldn't start: %v", err)
 		os.Exit(1)
 	}
 
-	// Prepare GitHub
-	githubToken, err = loadGitHubToken() // flags.go
-	if err != nil {
-		log.Errorf("Program couldn't load the GitHub token: %v", err)
-		os.Exit(1)
-	}
+	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up (WaitGroup), and then os.Exit(0)
+	// TODO: change to SIGHUP
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// Start github bot
-	githubBot := NewGitHubIssueBot(githubToken) // github.go
-	githubBot.Connect()
-	if ok, _ := githubBot.CheckOrg(*flagOrg); !ok {
+	githubBot := NewGitHubIssueBot(cfg.githubToken) // github.go
+	githubBot.Connect(ctx)
+	if ok, err := githubBot.CheckOrg(ctx, cfg.org); !ok || err != nil {
+		if err != nil {
+			log.Errorf("Error checking for organization: %v", trace.Wrap(err))
+		}
 		log.Errorf("Couldn't load or find the org supplied")
 		os.Exit(1)
 	}
 
-	// Prepare Slack
-	slackToken, err = loadSlackToken() // flags.go
-	if err != nil {
-		log.Errorf("Program couldn't load the Slack token: %v", err)
-		os.Exit(1)
-	}
-	authedUsers, err = loadAuthedUsers()
-	if err != nil {
-		log.Errorf("Program couldn't load the authed users: %v", err)
-		os.Exit(1)
-	}
-
-	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up (WaitGroup), and then os.Exit(0)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	go func() {
-		log.Infof("IssueBot connected for org %v", *flagOrg)
-		err = openBot(ctx, slackToken, authedUsers, waitForCb, githubBot) // TODO: I really wanna put the WaitGroup+Running in the Context
+		err = openBot(ctx, cfg.slackToken, cfg.authedUsers, waitForCb, githubBot) // TODO: I really wanna put the WaitGroup+Running in the Context
 		if err != nil {
 			log.Errorf("Some problem starting the Slack bot: %T: %v", err, err)
 			os.Exit(1)
 		}
+		log.Infof("IssueBot connected for org %v", cfg.org)
 	}()
 
 	run(ctx)
 
-	// Don't exit until done- this should be timed-out
+	// Don't exit until done- TODO this should be timed-out
 	waitForCb.Wait()
 	cancel()
 }
@@ -94,7 +71,7 @@ func run(ctx context.Context) {
 	// This is all for catching signals
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt)
-	timeNow := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
+	var timeNow time.Time
 	log.Infof("Waitng for signals...")
 	// Now we're going to wait on signals from terminal
 	for {

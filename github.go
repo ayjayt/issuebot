@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/mailgun/log"
-	"github.com/shurcooL/githubv4"
-	"golang.org/x/oauth2"
 	"net/http"
+
+	"github.com/gravitational/trace"
+	"github.com/mailgun/log"
+	"github.com/shurcooL/githubv4" // Serious concern that v4 is an inferior choice to v3
+	"golang.org/x/oauth2"
 )
 
+// TODO: create an issue object
 var (
-	errNoOrg = errors.New("Either user doesn't have access or org doesn't exist")
+	errNoOrg = errors.New("either user doesn't have access or org doesn't exist")
 )
 
 // GitHubIssuebot is a helper type so we can initialize and call common functions easily
@@ -22,9 +25,8 @@ type GitHubIssueBot struct {
 	org        string
 }
 
-// NewGitHubIssueBot is basically a tiny initializer
+// NewGitHubIssueBot returns a new unconnected GitHubIssueBot with it's token set.
 func NewGitHubIssueBot(token string) (bot *GitHubIssueBot) {
-	// Really bothers me that this declares a pointer AND the value it points to- creates heap
 	bot = &GitHubIssueBot{
 		token: token,
 	}
@@ -32,12 +34,12 @@ func NewGitHubIssueBot(token string) (bot *GitHubIssueBot) {
 }
 
 // GetOrg() is a getter for the registered org
-func (g *GitHubIssueBot) GetOrg() (org string) {
+func (g *GitHubIssueBot) GetOrg() string {
 	return g.org
 }
 
-// CheckOrg sanity checks that we can access the organization passed as a parameter. How do I feel about v4? I dont' know.
-func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must paginate, repository
+// CheckOrg sanity checks that we can access the organization passed as a parameter.
+func (g *GitHubIssueBot) CheckOrg(ctx context.Context, org string) (ok bool, err error) {
 
 	variables := map[string]interface{}{
 		"org": githubv4.String(org),
@@ -59,9 +61,9 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 	// BUG(AJ) So hacky I'll call it a bug. ^^ refer to TODO above
 
 	// Basically, since graphql errors are "hard" to interrupt, we're just going to try and find the orgname first under users then under organizations
-	err = g.client.Query(context.Background(), &queryUser, variables)
+	err = g.client.Query(ctx, &queryUser, variables)
 	if err != nil {
-		err = g.client.Query(context.Background(), &queryOrg, variables)
+		err = g.client.Query(ctx, &queryOrg, variables)
 		if err == nil {
 			name = queryOrg.Organization.Name
 		}
@@ -70,7 +72,7 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 	}
 	if err != nil {
 		log.Errorf("Error in CheckOrg() couldn't access supplied org: %T: %v", err, err) // BUG(AJ) GitHub is kicking back the auth token sometimes, e.g. LOG: -LEGIT TOKEN-\n
-		return false, err
+		return false, trace.Wrap(err)
 	}
 
 	log.Debugf("Display Name of %v: %v", org, name)
@@ -80,7 +82,7 @@ func (g *GitHubIssueBot) CheckOrg(org string) (ok bool, err error) { // must pag
 }
 
 // NewIssue takes a repo, issue, and issueBody and creates a new issue
-func (g *GitHubIssueBot) NewIssue(repo string, title string, body string) (URL string, err error) {
+func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string, body string) (URL string, err error) {
 	variables := map[string]interface{}{
 		"org":  githubv4.String(g.org),
 		"repo": githubv4.String(repo),
@@ -93,11 +95,11 @@ func (g *GitHubIssueBot) NewIssue(repo string, title string, body string) (URL s
 		} `graphql:"repository(name: $repo, owner: $org)"`
 	}
 
-	err = g.client.Query(context.Background(), &query, variables)
+	err = g.client.Query(ctx, &query, variables)
 
 	if err != nil {
 		log.Errorf("Error in NewIssue() on query: %T: %v", err, err)
-		return "", err
+		return "", trace.Wrap(err)
 	}
 
 	// Preparing some types for a "mutate" query
@@ -121,10 +123,10 @@ func (g *GitHubIssueBot) NewIssue(repo string, title string, body string) (URL s
 			}
 		} `graphql:"createIssue(input: $input)"`
 	}
-	err = g.client.Mutate(context.Background(), &m, input, nil)
+	err = g.client.Mutate(ctx, &m, input, nil)
 	if err != nil {
 		log.Errorf("Error in NewIssue() on mutate: %T: %v", err, err)
-		return "", err
+		return "", trace.Wrap(err)
 	}
 
 	return string(m.CreateIssue.Issue.Url), nil
@@ -134,11 +136,11 @@ func (g *GitHubIssueBot) NewIssue(repo string, title string, body string) (URL s
 
 // Connect just replaces the internal variabels of the GitHubIssueBot structure- so it can be used to reconnect
 // TODO: It should be Disconnect/Reconnecting if not nil but this is okay for now
-func (g *GitHubIssueBot) Connect() (err error) {
+func (g *GitHubIssueBot) Connect(ctx context.Context) (err error) {
 	tokenSrc := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: g.token},
 	)
-	g.httpClient = oauth2.NewClient(context.Background(), tokenSrc)
+	g.httpClient = oauth2.NewClient(ctx, tokenSrc)
 
 	// We're wrapping the transport oath2 just gave us with ours from below
 	// but ours is really just a wrapper for the one we just got

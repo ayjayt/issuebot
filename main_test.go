@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	. "gopkg.in/check.v1" // not sure why we went this route (with .) but I'm taking hints from gravitational/hello
 	"os"
 	"runtime"
-
 	"testing"
 	"time"
+
+	. "gopkg.in/check.v1" // not sure why we went this route (with .) but I'm taking hints from gravitational/hello
 )
 
 // Check package hooks into normal testing
@@ -20,7 +20,7 @@ type MainSuite struct{}
 var _ = Suite(&MainSuite{})
 
 func (s *MainSuite) SetUpSuite(c *C) {
-	// If you want
+	// This may be used if test coverage improves
 }
 
 func (s *MainSuite) SetUpTest(c *C) {
@@ -40,7 +40,7 @@ func (s *MainSuite) TestRun(c *C) {
 		// c.Skip("Test doesn't work on windows")
 	}
 
-	// Factory for custom comments based on stage
+	// Function for custom comments based on stage
 	comment := func(stage string) CommentInterface {
 		return Commentf("Run test showed running to be %v when it should be %v %v.", running, !running, stage)
 	}

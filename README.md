@@ -35,6 +35,9 @@ The oauth library used by GitHub APIv4 for auth
 [github.com/mailgun/log](https://github.com/mailgun/log)  
 The logger used by this programmer
 
+[github.com/gravitational/trace](https://github.com/gravitational/trace)
+Used to enhance error handling
+
 #### Test
 
 [gopkg.in/check.v1](https://gopkg.in/check.v1)  
