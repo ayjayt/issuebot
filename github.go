@@ -142,9 +142,9 @@ func (g *GitHubIssueBot) Connect(ctx context.Context) (err error) {
 	)
 	g.httpClient = oauth2.NewClient(ctx, tokenSrc)
 
-	// We're wrapping the transport oath2 just gave us with ours from below
-	// but ours is really just a wrapper for the one we just got
+	// We're wrapping the RoundTripper oath2 just gave us
 	newTransport := &Transport{RoundTripper: g.httpClient.Transport}
+	//We're giving oath2 the wrapped RoundTripper
 	g.httpClient.Transport = newTransport
 
 	g.client = githubv4.NewClient(g.httpClient)
@@ -163,7 +163,7 @@ type Transport struct {
 	http.RoundTripper
 }
 
-// RoundTrip is a wrapper over oauth2.Transport.RoundTrip.
+// RoundTrip is a wrapper over oauth2.Transport.RoundTripper.
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// This header is required by github for creating issues
 	req.Header.Add("Accept", `application/vnd.github.starfire-preview+json`)
