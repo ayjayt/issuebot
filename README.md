@@ -50,7 +50,7 @@ A testing suite to enhance Go's native "testing" module
 1. Create a slack token (refer to slack docs)
 2. Create a github token (refer to github docs)  
 _NB: as of Feb 2019, this can be the personal or the "oauth"- effectively the same (oath), but "oath" registers your "app"_
-3. Create a file and list slack users (**BY WHAT**), each on a new line, who can use the issuebot. The default file name is *./userlist* but can be overrided by a flag.
+3. Create a file and list slack users (by user ID, not by user name)- each on a new line, who can use the issuebot. The default file name is *./userlist* but can be overrided by a flag.
 4. Run the program (see below for typical use or use `issuebot --help` to see all flags) in _./build/_ and it will do it's best to connect:
   * You must specify `--org "org name or user name"` so that IssueBot knows where to find repos specified by the user.
   * You must specify slack and github tokens with `--slack_token` and `--github_token`

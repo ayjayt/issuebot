@@ -60,8 +60,8 @@ func init() {
 // seperate to allow unit testing the logic in populateFlags.
 func flagHelper() (config, error) {
 	c, err := populateFlags(*flagOrg, *flagSlackToken, *flagGitHubToken, *flagAuthFile)
-	if err != nil {
-		c.loadAuthedUsers()
+	if err == nil {
+		err = c.loadAuthedUsers()
 	}
 	return c, err
 }
@@ -106,7 +106,7 @@ func populateFlags(org string, slackToken string, gitHubToken string, authFile s
 }
 
 // loadAuthedUsers maps a newline deliminated list of users to a string slice.
-func (c config) loadAuthedUsers() error {
+func (c *config) loadAuthedUsers() error {
 	authFileContents, err := ioutil.ReadFile(c.authFile)
 	if err != nil {
 		return trace.Wrap(err)

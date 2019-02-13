@@ -103,9 +103,11 @@ func slackBotHelper(ctx context.Context, token string, authedUsers []string, gBo
 	}
 
 	newIssue := &slacker.CommandDefinition{
-		Description: fmt.Sprintf("Creates a new issue on github for %v/YOUR_REPO", gBot.GetOrg()),
-		Example:     "new \"repo\" \"issue title\" \"issue body\"",
-		Handler:     botLink.createNewIssue,
+		Description:           fmt.Sprintf("Creates a new issue on github for %v/YOUR_REPO", gBot.GetOrg()),
+		Example:               "new \"repo\" \"issue title\" \"issue body\"",
+		AuthorizationRequired: true,
+		AuthorizedUsers:       authedUsers,
+		Handler:               botLink.createNewIssue,
 	}
 
 	// Register command
