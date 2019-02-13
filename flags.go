@@ -93,7 +93,7 @@ func populateFlags(org string, slackToken string, gitHubToken string, authFile s
 	return c, trace.Wrap(err)
 }
 
-// loadAuthedUsers maps a new-line deliminated list of users to a string slice 
+// loadAuthedUsers maps a new-line deliminated list of users to a string slice
 func loadAuthedUsers(authFile string) ([]string, error) {
 	authFileContents, err := ioutil.ReadFile(authFile)
 	if err != nil {

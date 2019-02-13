@@ -20,22 +20,21 @@ func init() {
 // run contains the main program logic
 func run(ctx context.Context) error {
 
-	cfg, err := flagHelper()
+	cfg, err := flagHelper() // flags.go
 	if err != nil {
 		return err
 	}
 
-	githubBot := NewGitHubIssueBot(cfg.gitHubToken) // github.go
-	githubBot.Connect(ctx) // NOTE: This is the main group context, an individual request should have it's own context
-	if ok, err := githubBot.CheckOrg(ctx, cfg.org); !ok || err != nil { // TODO: are we using ok still?
+	githubBot := NewGitHubIssueBot(ctx, cfg.gitHubToken) // github.go
+	if err := githubBot.CheckOrg(ctx, cfg.org); err != nil {
 		return err
 	}
 
 	slackBotErr := make(chan error)
 	go func() {
-		// TODO: Make this better
+		// TODO: Make this better // TODO TODO TODO
 		if err := openBot(ctx, cfg.slackToken, cfg.authedUsers, githubBot); err != nil {
-		 slackBotErr <- trace.Wrap(err)
+			slackBotErr <- trace.Wrap(err)
 		}
 	}()
 
@@ -60,6 +59,7 @@ func main() {
 
 	if err := run(ctx); err != nil {
 		log.Errorf("Program couldn't start: %v", err)
+		log.Errorf("Trace.Debug(err): %v", trace.DebugReport(err))
 		os.Exit(1)
 	}
 
