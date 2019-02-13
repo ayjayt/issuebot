@@ -14,7 +14,7 @@ import (
 
 const (
 	// TimeoutSeconds is how much time Slackbot gives GitHubBot
-	TimeoutSeconds = 4
+	TimeoutSeconds = 8
 )
 
 var (
@@ -24,11 +24,13 @@ var (
 
 var (
 	parseRegex *regexp.Regexp
+	escapeRegex *regexp.Regexp
 )
 
 func init() {
 	// See bottom of file to walk-through regex
 	parseRegex = regexp.MustCompile(`"([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)"`)
+	escapeRegex = regexp.MustCompile(`\\(.)`)
 }
 
 // paraseParams will collect slack command args as one string and parse it because slacker's built in parser isn't sufficient.
@@ -38,7 +40,10 @@ func parseParams(monoParam string) (repo string, title string, body string, err 
 	if (len(resultSlice) != 4) || (len(resultSlice[1]) == 0) || (len(resultSlice[2]) == 0) || (len(resultSlice[3]) == 0) {
 		return "", "", "", trace.Wrap(ErrBadParams)
 	}
-	return resultSlice[1], resultSlice[2], resultSlice[3], nil
+	getMatch := func (matched string) (string) { return matched }
+	deEscape := func (escaped string) (string) { return escapeRegex.ReplaceAllStringFunc(escaped, getMatch) }
+
+	return deEscape(resultSlice[1]), deEscape(resultSlice[2]), deEscape(resultSlice[3]), nil
 
 }
 
@@ -87,7 +92,7 @@ func newSlackBot(ctx context.Context, token string, authedUsers []string, gBot *
 func (s *slackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	// TODO: probably better to be part of an array of CommandDefinitions on slackBot struct then a reciever
 
-	// Sort out parameter
+	// 
 	allParams := r.StringParam("all", "")
 	repo, title, body, err := parseParams(allParams)
 	if err != nil {
@@ -97,17 +102,18 @@ func (s *slackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 		return
 	}
 
-	// Lets try to create a new issue // TODO: ctx with Timeout
+	// Lets try to create a new issue 
 	subCtx, cancel := context.WithTimeout(r.Context(), time.Second*TimeoutSeconds)
 	defer cancel()
 
 	issue, err := s.gBot.NewIssue(subCtx, repo, title, body)
 	if err != nil || subCtx.Err() != nil {
-		w.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
 		if err != nil {
+			w.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
 			log.Infof("Error with gBot.NewIssue: %v", err)
 			log.Infof(trace.DebugReport(err))
 		} else if subCtx.Err() != nil {
+			w.ReportError(errors.New("Your request timed out"))
 			log.Infof("Error with gBot.NewIssue: %v", err)
 			log.Infof(trace.DebugReport(err))
 		}
@@ -119,8 +125,8 @@ func (s *slackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 
 // Let's build the regex: https://stackoverflow.com/a/6525975
 // [^"\\]* <-- Find any non-" and non-\ (tokens) any number of times
-// \\. <-- Find any escaped character any number of times
-// (?:\\.[^"\\]*)* <-- Find any escape character followed by non-token any number of times... any number of times
+// \\. <-- Find any escaped character 
+// (?:\\.[^"\\]*)* <-- Find any escaped character followed by non-token any number of times... any number of times
 // [^"\\]*(?:\\.[^"\\]*)* <-- same as above but it's okay if it's preceeded by non-tokens
 // The regex is that repeated 3 times, matched, and surrounded by parenthesis so you can catch, for example:
 // "Hello World!" "Backslashes \"\\\" are great" "End":
