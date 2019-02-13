@@ -40,7 +40,7 @@ func init() {
 // b) a better parser
 // c) custom usage
 
-// BotLink describes a relationships between two persistent API connections.
+// BotLink describes a relationship between two persistent API connections.
 type BotLink struct {
 	sBot *slacker.Slacker // TODO: Maybe a CommandRecevier interface?
 	gBot IssuePoster
@@ -99,7 +99,7 @@ func slackBotHelper(ctx context.Context, token string, authedUsers []string, gBo
 
 	botLink := &BotLink{
 		sBot: slacker.NewClient(token),
-		gBou: gBot,
+		gBot: gBot,
 	}
 
 	newIssue := &slacker.CommandDefinition{
