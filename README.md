@@ -8,6 +8,8 @@ NB: It runs under a single user, and you can only have it write to one organizat
 
 There is a list of dependencies below- you can use your own dep manager or just use `go get`
 
+This project now has files necessary to use **godep** if you want to vendor the dependencies.
+
 _Hint: `git clone` this repo to your `$GOPATH/src` directory; `go help gopath` and `go help importpath` for more info_
 
 ### Make commands (more in _Makefile_): 
