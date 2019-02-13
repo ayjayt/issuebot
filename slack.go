@@ -46,7 +46,8 @@ type BotLink struct {
 	gBot IssuePoster
 }
 
-// paraseParams parses an argument string because slacker's parser is limited.
+// paraseParams parses an argument string into three quoted strings.
+// NOTE: The built-in parser only delimits by space, which isn't sufficient.
 func parseParams(monoParam string) (repo string, title string, body string, err error) {
 
 	resultSlice := parseRegex.FindStringSubmatch(monoParam)
