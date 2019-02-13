@@ -32,8 +32,12 @@ func run(ctx context.Context) error {
 
 	slackBotErr := make(chan error)
 	go func() {
-		if _, err := newSlackBot(ctx, cfg.slackToken, cfg.authedUsers, gitHubBot); err != nil {
-			slackBotErr <- trace.Wrap(err)
+		// NOTE: No need for returned botLink, but I'm sure it will be useful
+		if _, err := slackBotHelper(ctx, cfg.slackToken, cfg.authedUsers, gitHubBot); err != nil {
+			if err != context.Canceled {
+				slackBotErr <- trace.Wrap(err)
+			}
+			close(slackBotErr)
 		}
 	}()
 
@@ -45,6 +49,7 @@ func run(ctx context.Context) error {
 		log.Infof("Received interrupt signal")
 		// TODO: Healthy exit
 	case <-ctx.Done():
+		// NOTE: context.CancelFunc is a hard kill
 	case err := <-slackBotErr:
 		return err
 	}
