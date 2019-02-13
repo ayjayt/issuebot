@@ -5,94 +5,62 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"sync"
-	"time"
 
 	"github.com/gravitational/trace"
 	"github.com/mailgun/log"
 )
 
-// Var running is a flag that when set to false, tells all goroutines to exit nicely- and new callbacks not to start important network ops
-// Maybe a good candidate for context
-var running = true
-
-// Func init() prepares a console logger
+// init() prepares a console logger
 func init() {
 	// Note: You can load more loggers after this Init.
 	console, _ := log.NewLogger(log.Config{"console", "debug"}) // note: debug, info, warning, error
 	log.Init(console)
 }
 
-func main() {
-	// WaitGroup so that callbacks can finish before run exits when told to
-	var waitForCb sync.WaitGroup
+// run contains the main program logic
+func run(ctx context.Context) error {
 
 	cfg, err := flagHelper()
-	if err != nil { // flags.go
-		log.Errorf("Program couldn't start: %v", err)
-		os.Exit(1)
+	if err != nil {
+		return err
 	}
+
+	githubBot := NewGitHubIssueBot(cfg.gitHubToken) // github.go
+	githubBot.Connect(ctx) // NOTE: This is the main group context, an individual request should have it's own context
+	if ok, err := githubBot.CheckOrg(ctx, cfg.org); !ok || err != nil { // TODO: are we using ok still?
+		return err
+	}
+
+	slackBotErr := make(chan error)
+	go func() {
+		// TODO: Make this better
+		if err := openBot(ctx, cfg.slackToken, cfg.authedUsers, githubBot); err != nil {
+		 slackBotErr <- trace.Wrap(err)
+		}
+	}()
+
+	signalChannel := make(chan os.Signal, 1)
+	signal.Notify(signalChannel, os.Interrupt)
+
+	select {
+	case <-signalChannel:
+		log.Infof("Received interrupt signal")
+		// TODO: Healthy exit
+	case <-ctx.Done():
+	case err := <-slackBotErr:
+		return err
+	}
+	return nil
+}
+
+func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	githubBot := NewGitHubIssueBot(cfg.gitHubToken) // github.go
-	githubBot.Connect(ctx)
-	if ok, err := githubBot.CheckOrg(ctx, cfg.org); !ok || err != nil {
-		if err != nil {
-			log.Errorf("Error checking for organization: %v", trace.Wrap(err))
-		}
-		log.Errorf("Couldn't load or find the org supplied")
+	if err := run(ctx); err != nil {
+		log.Errorf("Program couldn't start: %v", err)
 		os.Exit(1)
-	}
-
-	go func() {
-		err = openBot(ctx, cfg.slackToken, cfg.authedUsers, waitForCb, githubBot) // TODO: I really wanna put the WaitGroup+Running in the Context
-		if err != nil {
-			log.Errorf("Some problem starting the Slack bot: %T: %v", err, err)
-			os.Exit(1)
-		}
-		log.Infof("IssueBot connected for org %v", cfg.org)
-	}()
-
-	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up (WaitGroup), and then os.Exit(0)
-	// TODO: change to SIGHUP
-	run(ctx)
-
-	// Don't exit until done- TODO this should be timed-out
-	waitForCb.Wait()
-	cancel()
-}
-
-// run waits for signals to exit or reload information
-func run(ctx context.Context) {
-
-	// This is all for catching signals
-	signalChannel := make(chan os.Signal, 1)
-	signal.Notify(signalChannel, os.Interrupt)
-	var timeNow time.Time
-	log.Infof("Waitng for signals...")
-	// Now we're going to wait on signals from terminal
-	for {
-		select {
-		case signalRecvd := <-signalChannel:
-			newTime := time.Now()
-			if newTime.Sub(timeNow) < 1000*time.Millisecond {
-				log.Infof("Exiting...")
-				running = false
-				return
-			}
-			timeNow = newTime
-			log.Infof("Received a signal: %v", signalRecvd)
-			log.Infof("Reloading auth'ed users and keys")
-			// TODO: reload authed users and keys- don't panic on error
-			// have they changed? no- don't do it
-			// are they there? no- warn
-			// else, redo, restart
-			log.Infof("Send again <1 second to exit cleanly")
-		case <-ctx.Done():
-			break
-		}
 	}
 
 }

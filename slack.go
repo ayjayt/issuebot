@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"sync"
 
 	"github.com/ayjayt/slacker"
 	"github.com/gravitational/trace"
@@ -53,7 +52,7 @@ func parseParam(allParam string) (repo string, title string, body string, ok boo
 }
 
 // openBot just starts the bot with the callback.
-func openBot(ctx context.Context, token string, authedUsers []string, waitForCb sync.WaitGroup, gBot *GitHubIssueBot) (err error) {
+func openBot(ctx context.Context, token string, authedUsers []string, gBot *GitHubIssueBot) (err error) {
 
 	// Making a dynamic "Description" message for our slackbot
 	var descriptionString strings.Builder
@@ -63,19 +62,9 @@ func openBot(ctx context.Context, token string, authedUsers []string, waitForCb 
 
 	sBot := slacker.NewClient(token)
 
-	// newCommand is built by a callback factory to attach the CB to a certain waitgroup and GitHubIssueBot
-	newCommand := func(waitForCb sync.WaitGroup, gBot *GitHubIssueBot) func(slacker.Request, slacker.ResponseWriter) {
+	// newCommand is built by a callback factory to attach the CB to a certain GitHubIssueBot
+	newCommand := func(gBot *GitHubIssueBot) func(slacker.Request, slacker.ResponseWriter) {
 		return func(request slacker.Request, response slacker.ResponseWriter) {
-
-			// running has let us know to stop taking new issues for the moment
-			if !running { // TODO: good candidate for context
-				response.ReportError(errors.New("Issuebot is starting up or shutting down, try again in a few seconds."))
-				return
-			}
-
-			// Okay, we're going to start network ops, so please wait until we're done
-			waitForCb.Add(1)
-			defer waitForCb.Done()
 
 			// Note: This supports multiple commands but not "", and I didn't want to override/reimplement the interfaces due to time-cost so I implemented a monolothic parameter and parse it myself.
 			allParam := request.StringParam("all", "")
@@ -98,7 +87,7 @@ func openBot(ctx context.Context, token string, authedUsers []string, waitForCb 
 			response.Reply(URL)
 			return
 		}
-	}(waitForCb, gBot) // call factory function with parameters bassed to openBot
+	}(gBot) // call factory function with parameters bassed to openBot
 
 	newIssue := &slacker.CommandDefinition{
 		Description: descriptionString.String(),
