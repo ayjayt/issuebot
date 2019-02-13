@@ -3,56 +3,98 @@ package main
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/ayjayt/slacker"
 	"github.com/gravitational/trace"
 	"github.com/mailgun/log"
 )
 
-// parseParam parses the single parameter into 3 because the built-in command parser can't handle whitespace. parseParam just wants to see three phrases in quotations.
-func parseParam(allParam string) (repo string, title string, body string, ok bool) {
+const (
+	// TimeoutSeconds is how much time Slackbot gives GitHubBot
+	TimeoutSeconds = 4
+)
 
-	// threeParams is the three phrases
-	var threeParams [3]string
-	// paramCount tracks how many phrases we've found
-	var paramCount int = 0
-	// quoteSwitch tracks if we're inside or outside quotations
-	var quoteSwitch bool = false
-	// escapeSwitch knows if we should process the next character specially or not
-	var escapeSwitch bool = false
+var (
+	// ErrBadParams is returned when user fails to properly format command arguments
+	ErrBadParams = errors.New("user improperly formated command arguments")
+)
+var (
+	parseRegex *regexp.Regexp
+)
 
-	// start is the index where last phrase started
-	var start int = 0
-	for i, c := range allParam {
-		if (i == 0) && (c != '"') { // first character has to be a quote
-			return "", "", "", false
-		} else if i == 0 { // first character AND it was a quote
-			quoteSwitch = true
-			start = i + 1
-		} else if (!escapeSwitch) && (c == '\\') { // we'll escape the next character if we weren't escaped
-			escapeSwitch = true
-		} else if escapeSwitch { // turn off escapeSwitch and move on (we have escaped the current character)
-			escapeSwitch = false
-		} else if c == '"' { // we've encountered a non-escaped quote
-			if quoteSwitch { // we were in quotes, now we're out
-				threeParams[paramCount] = allParam[start:i]
-				paramCount += 1
-			} else { // we are just starting quotes
-				start = i + 1
-			}
-			quoteSwitch = !quoteSwitch
-		}
-	}
-
-	if paramCount != 3 {
-		return "", "", "", false
-	}
-	return threeParams[0], threeParams[1], threeParams[2], true
+func init() {
+	// Let's build the regex: https://stackoverflow.com/a/6525975
+	// [^"\\]* <-- Find any non-" and non-\ (tokens) any number of times
+	// \\. <-- Find any escaped character any number of times
+	// (?:\\.[^"\\]*)* <-- Find any escape character followed by non-token any number of times... any number of times
+	// [^"\\]*(?:\\.[^"\\]*)* <-- same as above but it's okay if it's preceeded by non-tokens
+	// The regex is that repeated 3 times, matched, and surrounded by parenthesis so you can catch, for example:
+	// "Hello World!" "Backslashes \"\\\" are great" "End":
+	// Hello World!
+	// Backslashes "\" are great
+	// End
+	parseRegex = regexp.MustCompile(`"([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)"`)
 }
 
-// openBot just starts the bot with the callback.
-func openBot(ctx context.Context, token string, authedUsers []string, gBot *GitHubIssueBot) (err error) {
+// paraseParams will collect slack command args as one string and parse it because slacker's built in parser isn't sufficient.
+func parseParams(monoParam string) (repo string, title string, body string, err error) {
+
+	resultSlice := parseRegex.FindStringSubmatch(monoParam)
+	if (len(resultSlice) != 4) || (len(resultSlice[1]) == 0) || (len(resultSlice[2]) == 0) || (len(resultSlice[3]) == 0) {
+		return "", "", "", trace.Wrap(ErrBadParams)
+	}
+	return resultSlice[1], resultSlice[2], resultSlice[3], nil
+}
+
+// TODO: It would be superior if the pkg slacker had
+// a) custom auth
+// b) a better parser
+// c) custom usage
+
+type slackBot struct {
+	client      *slacker.Slacker
+	gBot        *GitHubIssueBot
+	token       string
+	authedUsers []string
+}
+
+func (s *slackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
+
+	// Sort out parameter
+	allParams := r.StringParam("all", "")
+	repo, title, body, err := parseParams(allParams)
+	if err != nil {
+		// This is strictly a user error so log it as info
+		log.Infof("Slackbot command user error: %v", err)
+		w.ReportError(errors.New("You must specify repo, title, and body for new issue! All in quotes."))
+		return
+	}
+
+	// Lets try to create a new issue // TODO: ctx with Timeout
+	subCtx, cancel := context.WithTimeout(r.Context(), time.Second*TimeoutSeconds)
+	defer cancel()
+
+	issue, err := s.gBot.NewIssue(subCtx, repo, title, body)
+	if err != nil || subCtx.Err() != nil {
+		w.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
+		if err != nil {
+			log.Infof("Error with gBot.NewIssue: %v", err)
+			log.Infof(trace.DebugReport(err))
+		} else if subCtx.Err() != nil {
+			log.Infof("Error with gBot.NewIssue: %v", err)
+			log.Infof(trace.DebugReport(err))
+		}
+		return
+	}
+	w.Reply(issue.Url)
+	return
+}
+
+// startBot registers the callback
+func newSlackBot(ctx context.Context, token string, authedUsers []string, gBot *GitHubIssueBot) (*slackBot, error) {
 
 	// Making a dynamic "Description" message for our slackbot
 	var descriptionString strings.Builder
@@ -60,48 +102,22 @@ func openBot(ctx context.Context, token string, authedUsers []string, gBot *GitH
 	descriptionString.WriteString(gBot.GetOrg())
 	descriptionString.WriteString("/YOUR_REPO")
 
-	sBot := slacker.NewClient(token)
-
-	// newCommand is built by a callback factory to attach the CB to a certain GitHubIssueBot
-	newCommand := func(gBot *GitHubIssueBot) func(slacker.Request, slacker.ResponseWriter) {
-		return func(request slacker.Request, response slacker.ResponseWriter) {
-
-			// Note: This supports multiple commands but not "", and I didn't want to override/reimplement the interfaces due to time-cost so I implemented a monolothic parameter and parse it myself.
-			allParam := request.StringParam("all", "")
-			repo, title, body, ok := parseParam(allParam)
-
-			// Params were bad
-			if !ok {
-				response.ReportError(errors.New("You must specify repo, title, and body for new issue! All in quotes."))
-				return
-			}
-
-			// Lets try to create a new issue
-			issue, err := gBot.NewIssue(ctx, repo, title, body);
-			if err != nil {
-				response.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
-				log.Errorf("Error with gBot.NewIssue: %v", err)
-				log.Errorf(trace.DebugReport(err))
-				return
-			}
-			// Issue was good
-			response.Reply(issue.Url)
-			return
-		}
-	}(gBot) // call factory function with parameters bassed to openBot
+	sBot := &slackBot{
+		client:      slacker.NewClient(token),
+		gBot:        gBot,
+		token:       token,
+		authedUsers: authedUsers,
+	}
 
 	newIssue := &slacker.CommandDefinition{
 		Description: descriptionString.String(),
 		Example:     "new \"repo\" \"issue title\" \"issue body\"",
-		Handler:     newCommand,
+		Handler:     sBot.createNewIssue,
 	}
 
-	// Reigster command
-	sBot.Command("new <all>", newIssue)
+	// Register command
+	sBot.client.Command("new <all>", newIssue)
 
-	log.Infof("Starting slack bot listen...")
-	err = sBot.Listen(ctx)
-	log.Infof("bot.Listen(ctx) returned")
-
-	return trace.Wrap(err)
+	err := sBot.client.Listen(ctx)
+	return sBot, trace.Wrap(err)
 }

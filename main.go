@@ -25,15 +25,14 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	githubBot := NewGitHubIssueBot(ctx, cfg.gitHubToken) // github.go
-	if err := githubBot.CheckOrg(ctx, cfg.org); err != nil {
+	gitHubBot := NewGitHubIssueBot(ctx, cfg.gitHubToken) // github.go
+	if err := gitHubBot.CheckOrg(ctx, cfg.org); err != nil {
 		return err
 	}
 
 	slackBotErr := make(chan error)
 	go func() {
-		// TODO: Make this better // TODO TODO TODO
-		if err := openBot(ctx, cfg.slackToken, cfg.authedUsers, githubBot); err != nil {
+		if _, err := newSlackBot(ctx, cfg.slackToken, cfg.authedUsers, gitHubBot); err != nil {
 			slackBotErr <- trace.Wrap(err)
 		}
 	}()

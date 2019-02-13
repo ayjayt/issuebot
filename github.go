@@ -10,22 +10,21 @@ import (
 	"golang.org/x/oauth2"
 )
 
-
 // Issue structure represents a GitHub issue object and a portion of fields available. NOTE: This structure is declared by GitHub.com
 type Issue struct {
-	Title string
+	Title      string
 	Repository struct {
-		Name string
+		Name  string
 		Owner struct {
 			Login string
 		}
 	}
-	Body string
+	Body   string
 	Author struct {
 		Login string
 	}
 	Number int
-	Url string
+	Url    string
 }
 
 // Helpful notes for GraphQL queries:
@@ -163,7 +162,6 @@ func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string
 	}
 
 	if err := g.client.Mutate(ctx, &m, input, nil); err != nil {
-		log.Errorf("Error in NewIssue() on mutate: %T: %v", err, err)
 		return nil, trace.Wrap(err)
 	}
 
