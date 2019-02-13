@@ -98,7 +98,7 @@ func slackBotHelper(ctx context.Context, token string, authedUsers []string, gBo
 
 	botLink := &BotLink{
 		sBot: slacker.NewClient(token),
-		gBot: gBot,
+		gBou: gBot,
 	}
 
 	newIssue := &slacker.CommandDefinition{
@@ -119,7 +119,7 @@ func slackBotHelper(ctx context.Context, token string, authedUsers []string, gBo
 // \\. <-- Find any escaped character
 // (?:\\.[^"\\]*)* <-- Find any escaped character followed by non-token any number of times... any number of times
 // [^"\\]*(?:\\.[^"\\]*)* <-- same as above but it's okay if it's preceeded by non-tokens
-// The regex is that repeated 3 times, matched, and surrounded by parenthesis so you can catch, for example:
+// The regex is that repeated 3 times, matched, and surrounded by quotations so you can catch, for example:
 // "Hello World!" "Backslashes \"\\\" are great" "End":
 // Hello World!
 // Backslashes "\" are great
