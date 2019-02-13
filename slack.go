@@ -21,21 +21,13 @@ var (
 	// ErrBadParams is returned when user fails to properly format command arguments
 	ErrBadParams = errors.New("user improperly formated command arguments")
 )
+
 var (
 	parseRegex *regexp.Regexp
 )
 
 func init() {
-	// Let's build the regex: https://stackoverflow.com/a/6525975
-	// [^"\\]* <-- Find any non-" and non-\ (tokens) any number of times
-	// \\. <-- Find any escaped character any number of times
-	// (?:\\.[^"\\]*)* <-- Find any escape character followed by non-token any number of times... any number of times
-	// [^"\\]*(?:\\.[^"\\]*)* <-- same as above but it's okay if it's preceeded by non-tokens
-	// The regex is that repeated 3 times, matched, and surrounded by parenthesis so you can catch, for example:
-	// "Hello World!" "Backslashes \"\\\" are great" "End":
-	// Hello World!
-	// Backslashes "\" are great
-	// End
+	// See bottom of file to walk-through regex
 	parseRegex = regexp.MustCompile(`"([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)"`)
 }
 
@@ -47,6 +39,7 @@ func parseParams(monoParam string) (repo string, title string, body string, err 
 		return "", "", "", trace.Wrap(ErrBadParams)
 	}
 	return resultSlice[1], resultSlice[2], resultSlice[3], nil
+
 }
 
 // TODO: It would be superior if the pkg slacker had
@@ -61,7 +54,38 @@ type slackBot struct {
 	authedUsers []string
 }
 
+// newSlackBot sets up a connection to slack and registers commands
+func newSlackBot(ctx context.Context, token string, authedUsers []string, gBot *GitHubIssueBot) (*slackBot, error) {
+
+	// Making a dynamic "Description" message for our slackbot
+	var descriptionString strings.Builder
+	descriptionString.WriteString("Creates a new issue on github for ")
+	descriptionString.WriteString(gBot.GetOrg())
+	descriptionString.WriteString("/YOUR_REPO")
+
+	sBot := &slackBot{
+		client:      slacker.NewClient(token),
+		gBot:        gBot,
+		token:       token,
+		authedUsers: authedUsers,
+	}
+
+	newIssue := &slacker.CommandDefinition{
+		Description: descriptionString.String(),
+		Example:     "new \"repo\" \"issue title\" \"issue body\"",
+		Handler:     sBot.createNewIssue,
+	}
+
+	// Register command
+	sBot.client.Command("new <all>", newIssue)
+
+	err := sBot.client.Listen(ctx)
+	return sBot, trace.Wrap(err)
+}
+
+// createNewIssue is the callback from the user's "New" command on Slack
 func (s *slackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
+	// TODO: probably better to be part of an array of CommandDefinitions on slackBot struct then a reciever
 
 	// Sort out parameter
 	allParams := r.StringParam("all", "")
@@ -93,31 +117,13 @@ func (s *slackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	return
 }
 
-// startBot registers the callback
-func newSlackBot(ctx context.Context, token string, authedUsers []string, gBot *GitHubIssueBot) (*slackBot, error) {
-
-	// Making a dynamic "Description" message for our slackbot
-	var descriptionString strings.Builder
-	descriptionString.WriteString("Creates a new issue on github for ")
-	descriptionString.WriteString(gBot.GetOrg())
-	descriptionString.WriteString("/YOUR_REPO")
-
-	sBot := &slackBot{
-		client:      slacker.NewClient(token),
-		gBot:        gBot,
-		token:       token,
-		authedUsers: authedUsers,
-	}
-
-	newIssue := &slacker.CommandDefinition{
-		Description: descriptionString.String(),
-		Example:     "new \"repo\" \"issue title\" \"issue body\"",
-		Handler:     sBot.createNewIssue,
-	}
-
-	// Register command
-	sBot.client.Command("new <all>", newIssue)
-
-	err := sBot.client.Listen(ctx)
-	return sBot, trace.Wrap(err)
-}
+// Let's build the regex: https://stackoverflow.com/a/6525975
+// [^"\\]* <-- Find any non-" and non-\ (tokens) any number of times
+// \\. <-- Find any escaped character any number of times
+// (?:\\.[^"\\]*)* <-- Find any escape character followed by non-token any number of times... any number of times
+// [^"\\]*(?:\\.[^"\\]*)* <-- same as above but it's okay if it's preceeded by non-tokens
+// The regex is that repeated 3 times, matched, and surrounded by parenthesis so you can catch, for example:
+// "Hello World!" "Backslashes \"\\\" are great" "End":
+// Hello World!
+// Backslashes "\" are great
+// End
