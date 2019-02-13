@@ -77,14 +77,15 @@ func openBot(ctx context.Context, token string, authedUsers []string, gBot *GitH
 			}
 
 			// Lets try to create a new issue
-			var URL string
-			URL, err = gBot.NewIssue(ctx, repo, title, body) // TODO: issue structure instead of three parameters
+			issue, err := gBot.NewIssue(ctx, repo, title, body);
 			if err != nil {
 				response.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
+				log.Errorf("Error with gBot.NewIssue: %v", err)
+				log.Errorf(trace.DebugReport(err))
 				return
 			}
 			// Issue was good
-			response.Reply(URL)
+			response.Reply(issue.Url)
 			return
 		}
 	}(gBot) // call factory function with parameters bassed to openBot

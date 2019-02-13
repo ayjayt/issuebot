@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	"github.com/gravitational/trace"
@@ -11,15 +10,28 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Helpful notes for GraphQL queries:
-// 1) Create an input structure or variables map to supply arguments
-// 2) Create a structure that reflects path to object and desired return fields
 
-// TODO: create an issue object
-var (
-	// ErrNoOrg is returned when the organization couldn't be found
-	ErrNoOrg = errors.New("either user doesn't have access or org doesn't exist")
-)
+// Issue structure represents a GitHub issue object and a portion of fields available. NOTE: This structure is declared by GitHub.com
+type Issue struct {
+	Title string
+	Repository struct {
+		Name string
+		Owner struct {
+			Login string
+		}
+	}
+	Body string
+	Author struct {
+		Login string
+	}
+	Number int
+	Url string
+}
+
+// Helpful notes for GraphQL queries:
+// 1) Create an input structure or variables map to supply arguments.
+// 2) Create a structure that reflects path to object and desired return fields. Eg: Issue
+// It's particular about capitalizing or not
 
 // GitHubIssueBot is a helper type to initialize and call common functions easily
 type GitHubIssueBot struct {
@@ -105,16 +117,13 @@ func (g *GitHubIssueBot) CheckOrg(ctx context.Context, org string) error {
 		if err = g.client.Query(ctx, &queryOrg, variables); err != nil {
 			return trace.Wrap(err)
 		}
-		g.org = queryOrg.Organization.Name
-	} else {
-		g.org = queryUser.User.Name
 	}
-
+	g.org = org
 	return nil
 }
 
 // NewIssue takes a repo, issue, and issueBody and creates a new issue
-func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string, body string) (string, error) { // TODO TODO TODO ISSUE CONFIG
+func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string, body string) (*Issue, error) { // TODO TODO TODO ISSUE CONFIG
 
 	// We need to see if the repo exists first. Search would still be better.
 	variables := map[string]interface{}{
@@ -129,19 +138,19 @@ func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string
 	}
 
 	if err := g.client.Query(ctx, &query, variables); err != nil {
-		return "", trace.Wrap(err)
+		return nil, trace.Wrap(err)
 	}
 
 	// Preparing some types for a "mutate" query
 	// This type should eventually be provided by the GitHubV4 dependency
-	type createIssueInput struct {
+	type CreateIssueInput struct {
 		Title            githubv4.String  `json:"title"`
 		Body             githubv4.String  `json:"body"`
 		RepositoryId     githubv4.ID      `json:"repositoryId"`
 		ClientMutationID *githubv4.String `json:"clientMutationId,omitempty"`
 	}
 
-	input := createIssueInput{
+	input := CreateIssueInput{
 		Title:        githubv4.String(title),
 		Body:         githubv4.String(body),
 		RepositoryId: query.Repository.ID,
@@ -149,16 +158,14 @@ func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string
 
 	var m struct {
 		CreateIssue struct {
-			Issue struct {
-				Url string
-			}
+			Issue Issue // TODO: I really don't know what to do about this. I like _t...
 		} `graphql:"createIssue(input: $input)"`
 	}
 
 	if err := g.client.Mutate(ctx, &m, input, nil); err != nil {
 		log.Errorf("Error in NewIssue() on mutate: %T: %v", err, err)
-		return "", trace.Wrap(err)
+		return nil, trace.Wrap(err)
 	}
 
-	return string(m.CreateIssue.Issue.Url), nil
+	return &m.CreateIssue.Issue, nil
 }
