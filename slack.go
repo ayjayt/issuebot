@@ -83,10 +83,11 @@ func (s *BotLink) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 			w.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
 			log.Infof("Error with gBot.NewIssue: %v", err)
 			log.Infof(trace.DebugReport(err))
-		} else if subCtx.Err() != nil {
+		}
+		if subCtx.Err() != nil {
 			w.ReportError(errors.New("Your request timed out"))
-			log.Infof("Error with gBot.NewIssue: %v", err)
-			log.Infof(trace.DebugReport(err))
+			log.Infof("Error with gBot.NewIssue: %v", subCtx.Err())
+			log.Infof(trace.DebugReport(subCtx.Err()))
 		}
 		return
 	}
