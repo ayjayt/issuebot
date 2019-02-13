@@ -49,7 +49,7 @@ func run(ctx context.Context) error {
 		log.Infof("Received interrupt signal")
 		// TODO: Healthy exit
 	case <-ctx.Done():
-		// NOTE: context.CancelFunc is a hard kill
+		// NOTE: context.CancelFunc is a hard kill, it won't acheive the goals of running/WaitGroup
 	case err := <-slackBotErr:
 		return err
 	}

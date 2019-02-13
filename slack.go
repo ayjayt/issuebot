@@ -23,7 +23,9 @@ var (
 )
 
 var (
-	parseRegex  *regexp.Regexp
+	// parseRegex will find three quoted strings
+	parseRegex *regexp.Regexp
+	// escapeRegex will remove one backslash
 	escapeRegex *regexp.Regexp
 )
 
@@ -38,19 +40,20 @@ func init() {
 // b) a better parser
 // c) custom usage
 
-// BotLink describes a relationships between two persistent API connections
+// BotLink describes a relationships between two persistent API connections.
 type BotLink struct {
 	sBot *slacker.Slacker
 	gBot *GitHubIssueBot
 }
 
-// paraseParams will collect slack command args as one string and parse it because slacker's built in parser isn't sufficient.
+// paraseParams parses an argument string because slacker's parser is limited.
 func parseParams(monoParam string) (repo string, title string, body string, err error) {
 
 	resultSlice := parseRegex.FindStringSubmatch(monoParam)
 	if (len(resultSlice) != 4) || (len(resultSlice[1]) == 0) || (len(resultSlice[2]) == 0) || (len(resultSlice[3]) == 0) {
 		return "", "", "", trace.Wrap(ErrBadParams)
 	}
+
 	getMatch := func(matched string) string { return matched }
 	deEscape := func(escaped string) string { return escapeRegex.ReplaceAllStringFunc(escaped, getMatch) }
 
@@ -58,7 +61,7 @@ func parseParams(monoParam string) (repo string, title string, body string, err 
 
 }
 
-// createNewIssue is the callback from the user's "New" command on Slack
+// createNewIssue is the callback containing logic for "new" command on Slack.
 func (s *BotLink) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 
 	allParams := r.StringParam("all", "")
@@ -70,7 +73,6 @@ func (s *BotLink) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 		return
 	}
 
-	// Lets try to create a new issue
 	subCtx, cancel := context.WithTimeout(r.Context(), time.Second*TimeoutSeconds)
 	defer cancel()
 
@@ -91,7 +93,7 @@ func (s *BotLink) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	return
 }
 
-// slackBotHelper sets up a connection initializes type variables, command definitions, and calls Listen()
+// slackBotHelper defines a BotLink and Slacker (bot) type, and calls Slacker.Listen
 func slackBotHelper(ctx context.Context, token string, authedUsers []string, gBot *GitHubIssueBot) (*BotLink, error) {
 
 	botLink := &BotLink{

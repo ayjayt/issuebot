@@ -10,7 +10,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Issue structure represents a GitHub issue object and a portion of fields available. NOTE: This structure is declared by GitHub.com
+// Issue structure represents a GitHub issue object and a portion of fields available.
+// NOTE: This structure is declared by GitHub.com
 type Issue struct {
 	Title      string
 	Repository struct {
@@ -27,12 +28,13 @@ type Issue struct {
 	Url    string
 }
 
-// Helpful notes for GraphQL queries:
-// 1) Create an input structure or variables map to supply arguments.
-// 2) Create a structure that reflects path to object and desired return fields. Eg: Issue
-// It's particular about capitalizing or not
+// NOTE graphQL basics-
+// graphQL Queries : SQL Select :: graphQL Mutations : SQL Upsert
+// 1) Create an input structure (for mutations) or
+// variables map (for queries) to supply arguments.
+// 2) Create a struct that reflects path to object and return fields. Eg: Issue
 
-// GitHubIssueBot is a helper type to initialize and call common functions easily
+// GitHubIssueBot is a helper type essentially wrapping oauth2 and githubv4.
 type GitHubIssueBot struct {
 	client     *githubv4.Client
 	httpClient *http.Client
@@ -40,16 +42,17 @@ type GitHubIssueBot struct {
 	org        string
 }
 
-// NOTE: The following two declerations are used to enable "preview mode" in github v4 API
+// NOTE: The following two declerations are used to enable "preview mode" in github v4 API.
 
-// Transport is a oauth2.Transport wrapper (a http.Transport wrapper itself ) enabling us to add headers to all requests.
+// Transport is a oauth2.Transport wrapper (an http.Transport wrapper itself)
+// enabling us to add headers to all requests.
 type Transport struct {
 	http.RoundTripper
 }
 
 // RoundTrip is a wrapper over oauth2.Transport.RoundTripper.
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// This header is required by github for creating issues
+	// This header is required by github for creating issues.
 	req.Header.Add("Accept", `application/vnd.github.starfire-preview+json`)
 	return t.RoundTripper.RoundTrip(req)
 }
@@ -59,21 +62,21 @@ func NewGitHubIssueBot(ctx context.Context, token string) *GitHubIssueBot {
 	gBot := &GitHubIssueBot{
 		token: token,
 	}
-	// Note: Connect is split into a seperate function so that it can be used to reconnect if needed
+	// NOTE: Connect is split into a seperate function so that it can be used to reconnect if needed.
 	gBot.Connect(ctx)
 	return gBot
 }
 
-// Connect creates an http.Client with oauth2 and attempts to connect to GitHub
-func (g *GitHubIssueBot) Connect(ctx context.Context) (err error) {
+// Connect creates an http.Client with oauth2 and attempts to connect to GitHub.
+func (g *GitHubIssueBot) Connect(ctx context.Context) {
 	tokenSrc := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: g.token},
 	)
 	g.httpClient = oauth2.NewClient(ctx, tokenSrc)
 
-	// We're wrapping the RoundTripper oath2 just gave us
+	// We're wrapping the RoundTripper oath2 just gave us.
 	newTransport := &Transport{RoundTripper: g.httpClient.Transport}
-	// We're giving oath2 the wrapped RoundTripper
+	// We're giving oath2 the wrapped RoundTripper.
 	g.httpClient.Transport = newTransport
 
 	g.client = githubv4.NewClient(g.httpClient)
@@ -81,17 +84,17 @@ func (g *GitHubIssueBot) Connect(ctx context.Context) (err error) {
 	return
 }
 
-// SetToken is just a setter for the private token member of the type
+// SetToken is just a setter for the private token member of the type.
 func (g *GitHubIssueBot) SetToken(token string) {
 	g.token = token
 }
 
-// GetOrg() is a getter for the specified organziation's full name
+// GetOrg is a getter for the specified organziation's full name.
 func (g *GitHubIssueBot) GetOrg() string {
 	return g.org
 }
 
-// CheckOrg finds the full name of an organization based off the "URL" name
+// CheckOrg finds the full name of an organization based off the "URL" name.
 func (g *GitHubIssueBot) CheckOrg(ctx context.Context, org string) error {
 
 	variables := map[string]interface{}{
@@ -121,8 +124,8 @@ func (g *GitHubIssueBot) CheckOrg(ctx context.Context, org string) error {
 	return nil
 }
 
-// NewIssue takes a repo, issue, and issueBody and creates a new issue
-func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string, body string) (*Issue, error) { // TODO TODO TODO ISSUE CONFIG
+// NewIssue takes a repo, issue, and issueBody and then creates a new issue.
+func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string, body string) (*Issue, error) {
 
 	// We need to see if the repo exists first. Search would still be better.
 	variables := map[string]interface{}{
@@ -140,8 +143,8 @@ func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string
 		return nil, trace.Wrap(err)
 	}
 
-	// Preparing some types for a "mutate" query
-	// This type should eventually be provided by the GitHubV4 dependency
+	// NOTE: This type should eventually be provided by the GitHubV4 dependency
+	// NOTE: pkg githubv4 depends on this type name
 	type CreateIssueInput struct {
 		Title            githubv4.String  `json:"title"`
 		Body             githubv4.String  `json:"body"`
@@ -157,7 +160,7 @@ func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string
 
 	var m struct {
 		CreateIssue struct {
-			Issue Issue // TODO: I really don't know what to do about this. I like _t...
+			Issue Issue // TODO: This seems awkward
 		} `graphql:"createIssue(input: $input)"`
 	}
 
