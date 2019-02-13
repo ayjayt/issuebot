@@ -26,20 +26,17 @@ func init() {
 func main() {
 	// WaitGroup so that callbacks can finish before run exits when told to
 	var waitForCb sync.WaitGroup
-	var err error
 
-	cfg, err := checkAndSetDefaults()
+	cfg, err := flagHelper()
 	if err != nil { // flags.go
 		log.Errorf("Program couldn't start: %v", err)
 		os.Exit(1)
 	}
 
-	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up (WaitGroup), and then os.Exit(0)
-	// TODO: change to SIGHUP
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	githubBot := NewGitHubIssueBot(cfg.githubToken) // github.go
+	githubBot := NewGitHubIssueBot(cfg.gitHubToken) // github.go
 	githubBot.Connect(ctx)
 	if ok, err := githubBot.CheckOrg(ctx, cfg.org); !ok || err != nil {
 		if err != nil {
@@ -58,6 +55,8 @@ func main() {
 		log.Infof("IssueBot connected for org %v", cfg.org)
 	}()
 
+	// run will wait for a signal (SIGINTish), wait for the slackbot to clean up (WaitGroup), and then os.Exit(0)
+	// TODO: change to SIGHUP
 	run(ctx)
 
 	// Don't exit until done- TODO this should be timed-out
