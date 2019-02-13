@@ -10,6 +10,11 @@ import (
 	"io/ioutil"
 )
 
+const (
+	// defaultAuthFilePath is used in the flags list
+	defaultAuthFilePath = "./userlist"
+)
+
 var (
 	// ErrBadFlag is returned whenever the user has improperly run the program.
 	ErrBadFlag = errors.New("command was run improperly, check --help")
@@ -25,7 +30,7 @@ var (
 
 	// flagAuth is path to textfile of authorized users.
 	flagAuthFile = flag.String("auth",
-		"./userlist",
+		defaultAuthFilePath,
 		"What file contains a list of authorized users")
 
 	// flagSlackToken is a slack token.
@@ -43,6 +48,7 @@ type config struct {
 	slackToken  string
 	gitHubToken string
 	org         string
+	authFile    string
 	authedUsers []string
 }
 
@@ -53,7 +59,11 @@ func init() {
 // flagHelper calls populateFlags with the flags above. These functions are
 // seperate to allow unit testing the logic in populateFlags.
 func flagHelper() (config, error) {
-	return populateFlags(*flagOrg, *flagSlackToken, *flagGitHubToken, *flagAuthFile)
+	c, err := populateFlags(*flagOrg, *flagSlackToken, *flagGitHubToken, *flagAuthFile)
+	if err != nil {
+		c.loadAuthedUsers()
+	}
+	return c, err
 }
 
 // populateFlags checks flag validity and initializes a "config" struct.
@@ -85,23 +95,25 @@ func populateFlags(org string, slackToken string, gitHubToken string, authFile s
 	}
 	c.gitHubToken = gitHubToken
 
+	c.authFile = authFile
+
 	if err != nil {
 		flag.PrintDefaults()
 		return c, trace.Wrap(err)
 	}
 
-	c.authedUsers, err = loadAuthedUsers(authFile)
 	return c, trace.Wrap(err)
 }
 
 // loadAuthedUsers maps a newline deliminated list of users to a string slice.
-func loadAuthedUsers(authFile string) ([]string, error) {
-	authFileContents, err := ioutil.ReadFile(authFile)
+func (c config) loadAuthedUsers() error {
+	authFileContents, err := ioutil.ReadFile(c.authFile)
 	if err != nil {
-		return nil, trace.Wrap(err)
+		return trace.Wrap(err)
 	}
 	authedUsers := strings.Split(string(authFileContents), "\n")
 
 	// NOTE: The last slice element after strings.Split is empty, so truncate
-	return authedUsers[:len(authedUsers)-1], nil
+	c.authedUsers = authedUsers[:len(authedUsers)-1]
+	return nil
 }
