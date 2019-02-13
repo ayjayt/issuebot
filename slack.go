@@ -42,8 +42,8 @@ func init() {
 
 // BotLink describes a relationships between two persistent API connections.
 type BotLink struct {
-	sBot *slacker.Slacker
-	gBot *GitHubIssueBot
+	sBot *slacker.Slacker // TODO: Maybe a CommandRecevier interface?
+	gBot IssuePoster
 }
 
 // paraseParams parses an argument string because slacker's parser is limited.

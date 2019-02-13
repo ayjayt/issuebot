@@ -67,8 +67,8 @@ func (s *MainSuite) TestRun(c *C) {
 		close(blockChan) // close channel to communicate to goroutine that run finished
 	}()
 
-	<-blockChan                        // Just making sure that coroutine started
-	time.Sleep(200 * time.Millisecond) // Effectively a timeout for the run() coroutine to do it's thing
+	<-blockChan                        // Just making sure that goroutine started
+	time.Sleep(200 * time.Millisecond) // Effectively a timeout for the run() goroutine to do it's thing
 
 	// BUG(AJ): This os.Process.Signal(os.Interrupt) wont work on windows? https://github.com/golang/go/issues/6720
 	// It seems that only the test is affected. ^C is interpreted correctly as os.Interrupt when _listening_, but sending os.Interrupt does != ^C on windows
