@@ -91,7 +91,7 @@ func (s *SlackBot) SetGBot(r slacker.Request, gBot *GitHubIssueBot) bool {
 
 // DeleteGBot will create a new user-github association
 func (s *SlackBot) DeleteGBot(r slacker.Request) {
-	log.Infof("Deleting bot") // all log ettiquette
+	log.Infof("Deleting bot") // TODO: all log ettiquette
 	s.gBots.Delete(r.Event().User)
 	// TODO DISK
 }
@@ -111,7 +111,7 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	repo, title, body, err := parseParams(allParams)
 	if err != nil {
 		// This is strictly a user error so log it as info
-		log.Infof(err)
+		log.Infof("new issue error: %v", err)
 		w.ReportError(errors.New("You must specify repo, title, and body for new issue! All in quotes."))
 		return
 	}
@@ -127,12 +127,12 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	if err != nil || subCtx.Err() != nil {
 		if err != nil {
 			w.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
-			log.Infof(err)
+			log.Infof("new issue error: %v", err)
 			log.Infof(trace.DebugReport(err))
 		}
 		if subCtx.Err() != nil {
 			w.ReportError(errors.New("Your request timed out"))
-			log.Infof(subCtx.Err())
+			log.Infof("new issue error: %v", subCtx.Err())
 			log.Infof(trace.DebugReport(subCtx.Err()))
 		}
 		return
@@ -170,6 +170,17 @@ func (s *SlackBot) registerUser(r slacker.Request, w slacker.ResponseWriter) {
 	return
 }
 
+func (s *SlackBot) deleteUser(r slacker.Request, w slacker.ResponseWriter) {
+	if s.CheckRun(w) {
+		defer s.Done()
+	} else {
+		return
+	}
+	s.DeleteGBot(r)
+	w.Reply("If you had registered, you are no longer.")
+	return
+}
+
 /*************
 * The following are initializers
 *************/
@@ -187,7 +198,6 @@ func newSlackBot(token string, authedUsers []string) *SlackBot {
 		Description:           fmt.Sprintf("Creates a new issue on github for repo specified"),
 		Example:               `new "repo" "issue title" "issue body"`,
 		AuthorizationRequired: false,
-		AuthorizedUsers:       authedUsers, // TODO: we can do custom parser and everything now
 		Handler:               slackBot.createNewIssue,
 	}
 	registerUser := &slacker.CommandDefinition{
@@ -195,9 +205,15 @@ func newSlackBot(token string, authedUsers []string) *SlackBot {
 		AuthorizationRequired: false,
 		Handler:               slackBot.registerUser,
 	}
+	deleteUser := &slacker.CommandDefinition{
+		Description:           "Disassociate a github token with a user",
+		AuthorizationRequired: false,
+		Handler:               slackBot.deleteUser,
+	}
 
 	// Register command
 	slackBot.sBot.Command("register <token>", registerUser)
+	slackBot.sBot.Command("unregister", deleteUser)
 	slackBot.sBot.Command("new <all>", newIssue) // TODO: we can make this legit and then NOT USE IT
 
 	return slackBot
