@@ -60,14 +60,15 @@ func init() {
 // seperate to allow unit testing the logic in populateFlags.
 func flagHelper() (config, error) {
 	c, err := populateFlags(*flagOrg, *flagSlackToken, *flagGitHubToken, *flagAuthFile)
-	if err == nil {
-		err = c.loadAuthedUsers()
+	if err != nil {
+		return c, err
 	}
+	err = c.loadAuthedUsers()
 	return c, err
 }
 
 // populateFlags checks flag validity and initializes a "config" struct.
-func populateFlags(org string, slackToken string, gitHubToken string, authFile string) (config, error) {
+func populateFlags(org, slackToken, gitHubToken, authFile string) (config, error) {
 
 	c := config{}
 	// NOTE: It's more efficient (in the long run) to copy this structure by value

@@ -13,19 +13,29 @@ import (
 // Issue structure represents a GitHub issue object and a portion of fields available.
 // NOTE: This structure is declared by GitHub.com
 type Issue struct {
-	Title      string
+	// Title is the title of the GitHub issue
+	Title string
+	// Repository contains fields describing repo the issue is on
 	Repository struct {
-		Name  string
+		// Name is the issue's repository's Name
+		Name string
+		// Owner is an object describing the user who owns the repository described by the repository object
 		Owner struct {
+			// Login is the login name of the issue's repository's owner
 			Login string
 		}
 	}
-	Body   string
+	// Body is the body of the issue
+	Body string
+	// Author is an object containing information about the issue's author
 	Author struct {
+		// Login is the login name of the author object
 		Login string
 	}
+	// Number is the issue number
 	Number int
-	Url    string
+	// Url is the issue's url
+	Url string
 }
 
 // NOTE graphQL basics-

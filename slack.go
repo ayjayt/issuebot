@@ -114,7 +114,7 @@ func newSlackBot(token string, authedUsers []string, gBot *GitHubIssueBot) *Slac
 
 	newIssue := &slacker.CommandDefinition{
 		Description:           fmt.Sprintf("Creates a new issue on github for %v/YOUR_REPO", gBot.GetOrg()),
-		Example:               "new \"repo\" \"issue title\" \"issue body\"",
+		Example:               `new "repo" "issue title" "issue body"`,
 		AuthorizationRequired: true,
 		AuthorizedUsers:       authedUsers,
 		Handler:               slackBot.createNewIssue,
@@ -142,18 +142,21 @@ func (s *SlackBot) EmptyQueue() {
 
 // CheckRun will check to see if you should be using the waitgroup.
 func (s *SlackBot) CheckRun(w slacker.ResponseWriter) bool {
-	if !s.running {
+
+	if !s.running { // Don't lock if we're not running
 		w.ReportError(errors.New("I'm shutting down"))
 		return false
 	}
 	s.wg.Add(1)
-	if !s.running {
+	if !s.running { // Unlock if we canceled between the first if statement and now
+		w.wg.Done()
 		w.ReportError(errors.New("I'm shutting down"))
 		return false
 	}
 	return true
 }
 
+// Done is just a wrapper for sync.WaitGroup.Done
 func (s *SlackBot) Done() {
 	s.wg.Done()
 }

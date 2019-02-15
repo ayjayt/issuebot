@@ -22,12 +22,12 @@ func run(ctx context.Context) error {
 
 	cfg, err := flagHelper() // flags.go
 	if err != nil {
-		return err
+		return trace.Wrap(err)
 	}
 
 	gitHubBot := NewGitHubIssueBot(ctx, cfg.gitHubToken) // github.go
 	if err := gitHubBot.CheckOrg(ctx, cfg.org); err != nil {
-		return err
+		return trace.Wrap(err)
 	}
 
 	slackBot := newSlackBot(cfg.slackToken, cfg.authedUsers, gitHubBot)
@@ -52,7 +52,7 @@ func run(ctx context.Context) error {
 	case <-ctx.Done():
 		// NOTE: context.CancelFunc is a hard kill, it won't acheive the goals of running/WaitGroup
 	case err := <-slackBotErr:
-		return err
+		return trace.Wrap(err)
 	}
 	return nil
 }
