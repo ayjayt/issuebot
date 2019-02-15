@@ -11,6 +11,7 @@ import (
 	"github.com/ayjayt/slacker"
 	"github.com/gravitational/trace"
 	"github.com/mailgun/log"
+	"github.com/shomali11/proper"
 )
 
 const (
@@ -25,29 +26,14 @@ var (
 
 var (
 	// parseRegex will find three quoted strings
-	parseRegex *regexp.Regexp
+	issueRegex *regexp.Regexp
 	// escapeRegex will remove one backslash
 	escapeRegex *regexp.Regexp
 )
 
-// paraseParams parses an argument string into three quoted strings.
-func parseParams(monoParam string) (repo string, title string, body string, err error) {
-
-	resultSlice := parseRegex.FindStringSubmatch(monoParam)
-	if (len(resultSlice) != 4) || (len(resultSlice[1]) == 0) || (len(resultSlice[2]) == 0) || (len(resultSlice[3]) == 0) {
-		return "", "", "", trace.Wrap(ErrBadParams)
-	}
-
-	getMatch := func(matched string) string { return matched }
-	deEscape := func(escaped string) string { return escapeRegex.ReplaceAllStringFunc(escaped, getMatch) }
-
-	return deEscape(resultSlice[1]), deEscape(resultSlice[2]), deEscape(resultSlice[3]), nil
-
-}
-
 func init() {
-	// See bottom of file to walk-through regex
-	parseRegex = regexp.MustCompile(`"([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)"`)
+	// See bottom of file to walk-through (partial)
+	issueRegex = regexp.MustCompile(`^\s*(?:<@(\S+)>)?\s*new\s+"([^"\\]*(?:\\.[^"\\]*)*)"\s+"([^"\\]*(?:\\.[^"\\]*)*)"\s+"([^"\\]*(?:\\.[^"\\]*)*)"\s*$`)
 	escapeRegex = regexp.MustCompile(`\\(.)`)
 }
 
@@ -58,6 +44,34 @@ type SlackBot struct {
 	// TODO: default gBot based on token
 	wg      *sync.WaitGroup
 	running bool
+	botID   string
+}
+
+// newIssueParser takes a whole command and matches and creates three params.
+func (s *SlackBot) newIssueParser(text string) (*proper.Properties, bool) {
+	log.Infof("in newIssueParser for %v with %v", s.botID, text)
+	resultSlice := issueRegex.FindStringSubmatch(text)
+
+	var wordOffset = 0
+	if (len(resultSlice) < 2) || (len(resultSlice[1]) == 0) || (len(resultSlice[2]) == 0) || (len(resultSlice[3]) == 0) {
+		return nil, false
+	}
+	if len(resultSlice) == 5 {
+		if (len(resultSlice[4]) == 0) || (resultSlice[1] != s.botID) {
+			return nil, false
+		} else {
+			wordOffset = 1
+		}
+	}
+
+	getMatch := func(matched string) string { return matched }
+	deEscape := func(escaped string) string { return escapeRegex.ReplaceAllStringFunc(escaped, getMatch) }
+	parameters := make(map[string]string)
+	parameters["repo"] = deEscape(resultSlice[1+wordOffset])
+	parameters["title"] = deEscape(resultSlice[2+wordOffset])
+	parameters["body"] = deEscape(resultSlice[3+wordOffset])
+	return proper.NewProperties(parameters), true
+
 }
 
 /*************
@@ -79,7 +93,6 @@ func (s *SlackBot) GetGBot(r slacker.Request) *GitHubIssueBot {
 
 // SetGBot will create a new user-github association
 func (s *SlackBot) SetGBot(r slacker.Request, gBot *GitHubIssueBot) bool {
-	log.Infof("Setting bot")
 	_, ok := s.gBots.Load(r.Event().User)
 	if ok {
 		return !ok
@@ -107,14 +120,9 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	} else {
 		return
 	}
-	allParams := r.StringParam("all", "")
-	repo, title, body, err := parseParams(allParams)
-	if err != nil {
-		// This is strictly a user error so log it as info
-		log.Infof("new issue error: %v", err)
-		w.ReportError(errors.New("You must specify repo, title, and body for new issue! All in quotes."))
-		return
-	}
+	repo := r.StringParam("repo", "")
+	title := r.StringParam("title", "")
+	body := r.StringParam("body", "")
 
 	subCtx, cancel := context.WithTimeout(r.Context(), time.Second*TimeoutSeconds)
 	defer cancel()
@@ -160,7 +168,7 @@ func (s *SlackBot) registerUser(r slacker.Request, w slacker.ResponseWriter) {
 	if err != nil {
 		w.ReportError(errors.New("Token didn't work"))
 		return
-	} // TODO: find a better function
+	}
 	ok := s.SetGBot(r, gBot)
 	if !ok {
 		w.ReportError(errors.New("User already registered, please delete first."))
@@ -195,16 +203,19 @@ func newSlackBot(token string, authedUsers []string) *SlackBot {
 	}
 
 	newIssue := &slacker.CommandDefinition{
-		Description:           fmt.Sprintf("Creates a new issue on github for repo specified"),
+		Description:           "Creates a new issue on github for repo specified",
 		Example:               `new "repo" "issue title" "issue body"`,
 		AuthorizationRequired: false,
+		CustomParser:          slackBot.newIssueParser,
 		Handler:               slackBot.createNewIssue,
 	}
+
 	registerUser := &slacker.CommandDefinition{
 		Description:           "Associate a github token with a user",
 		AuthorizationRequired: false,
 		Handler:               slackBot.registerUser,
 	}
+
 	deleteUser := &slacker.CommandDefinition{
 		Description:           "Disassociate a github token with a user",
 		AuthorizationRequired: false,
@@ -214,8 +225,18 @@ func newSlackBot(token string, authedUsers []string) *SlackBot {
 	// Register command
 	slackBot.sBot.Command("register <token>", registerUser)
 	slackBot.sBot.Command("unregister", deleteUser)
-	slackBot.sBot.Command("new <all>", newIssue) // TODO: we can make this legit and then NOT USE IT
-
+	slackBot.sBot.Command("new <repo> <title> <body>", newIssue)
+	slackBot.sBot.Init(func(s *SlackBot) func() {
+		return func() {
+			// TODO: add context
+			res, err := s.sBot.Client().AuthTest()
+			if err != nil {
+				trace.Wrap(err)
+				log.Errorf("Error trying to get botname: %v", trace.DebugReport(err))
+			}
+			s.botID = res.UserID
+		}
+	}(slackBot))
 	return slackBot
 }
 

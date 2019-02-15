@@ -2,12 +2,12 @@
 
 
 [[projects]]
-  branch = "master"
-  digest = "1:e9c8e13e422f6b2ce7568671871f110348f8cf3755c9b52d6dbc661f038d6c3c"
+  branch = "odd_changes"
+  digest = "1:25b9e8fa9f2e7a67e6a5dfb5d09b13c4505aeda97d1c42c4098e9fbb77f7f8cf"
   name = "github.com/ayjayt/slacker"
   packages = ["."]
   pruneopts = "UT"
-  revision = "38fde444c3c9f9dd153446f065edc6d1b662b9c8"
+  revision = "6b0e1eb5e1cb843771c47e2917fccd91ceb9779b"
 
 [[projects]]
   digest = "1:97df918963298c287643883209a2c3f642e6593379f97ab400c2a2e219ab647d"
@@ -75,14 +75,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7711bc85fa91b919713feda232ffe0bd4ebb0e8426b9c0de6c6f476e0eb9b7c2"
+  digest = "1:90fc157137d61202780d1712daf78ef7c69fdc93c2aee92a7c6b7a0df2026332"
   name = "github.com/nlopes/slack"
   packages = [
     ".",
     "slackutilsx",
   ]
   pruneopts = "UT"
-  revision = "a7deeca7935c178aa865249bab511daf816288ba"
+  revision = "e73b432e20b0f00bfa92b15f51e43fc79247611b"
 
 [[projects]]
   digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
@@ -175,7 +175,7 @@
     "windows",
   ]
   pruneopts = "UT"
-  revision = "983097b1a8a340cd1cc7df17d735154d89e10b1a"
+  revision = "d0b11bdaac8adb652bff00e49bcacf992835621a"
 
 [[projects]]
   digest = "1:6f3bd49ddf2e104e52062774d797714371fac1b8bddfd8e124ce78e6b2264a10"
@@ -208,6 +208,7 @@
     "github.com/ayjayt/slacker",
     "github.com/gravitational/trace",
     "github.com/mailgun/log",
+    "github.com/shomali11/proper",
     "github.com/shurcooL/githubv4",
     "golang.org/x/oauth2",
     "gopkg.in/check.v1",
