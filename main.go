@@ -44,7 +44,7 @@ func run(ctx context.Context) error {
 
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt)
-
+	log.Infof("Ready to go")
 	select {
 	case <-signalChannel:
 		log.Infof("Received interrupt signal")

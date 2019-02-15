@@ -128,8 +128,8 @@ func newSlackBot(token string, authedUsers []string, gBot *GitHubIssueBot) *Slac
 
 // Listen calls Listen on the underlying slackbot
 func (s *SlackBot) Listen(ctx context.Context) error {
-	err := s.sBot.Listen(ctx)
 	s.running = true
+	err := s.sBot.Listen(ctx)
 	return trace.Wrap(err)
 }
 
@@ -149,7 +149,7 @@ func (s *SlackBot) CheckRun(w slacker.ResponseWriter) bool {
 	}
 	s.wg.Add(1)
 	if !s.running { // Unlock if we canceled between the first if statement and now
-		w.wg.Done()
+		s.wg.Done()
 		w.ReportError(errors.New("I'm shutting down"))
 		return false
 	}
