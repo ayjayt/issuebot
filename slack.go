@@ -30,27 +30,7 @@ var (
 	escapeRegex *regexp.Regexp
 )
 
-func init() {
-	// See bottom of file to walk-through regex
-	parseRegex = regexp.MustCompile(`"([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)"`)
-	escapeRegex = regexp.MustCompile(`\\(.)`)
-}
-
-// SlackBot is a wrapper for the underlying slackbot to include some important variabales
-type SlackBot struct {
-	sBot    *slacker.Slacker
-	gBot    *GitHubIssueBot
-	wg      *sync.WaitGroup
-	running bool
-}
-
-// TODO: It would be superior if the pkg slacker had
-// a) custom auth
-// b) a better parser
-// c) custom usage
-
 // paraseParams parses an argument string into three quoted strings.
-// NOTE: The built-in parser only delimits by space, which isn't sufficient.
 func parseParams(monoParam string) (repo string, title string, body string, err error) {
 
 	resultSlice := parseRegex.FindStringSubmatch(monoParam)
@@ -64,6 +44,62 @@ func parseParams(monoParam string) (repo string, title string, body string, err 
 	return deEscape(resultSlice[1]), deEscape(resultSlice[2]), deEscape(resultSlice[3]), nil
 
 }
+
+func init() {
+	// See bottom of file to walk-through regex
+	parseRegex = regexp.MustCompile(`"([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)" "([^"\\]*(?:\\.[^"\\]*)*)"`)
+	escapeRegex = regexp.MustCompile(`\\(.)`)
+}
+
+// SlackBot is a wrapper for the underlying slackbot to include some important variabales
+type SlackBot struct {
+	sBot  *slacker.Slacker
+	gBots sync.Map
+	//gBots   map[string]*GitHubIssueBot // Should this be a sync map
+	wg      *sync.WaitGroup
+	running bool
+}
+
+/*************
+* The following are for routing slack users to their github client with github client token CRUD functions
+*************/
+
+// GetGBot can find the relevant github client for a particular slack user. or initialize it
+func (s *SlackBot) GetGBot(r slacker.Request) *GitHubIssueBot {
+	log.Infof("Getting bot for : %v", r.Event().User)
+	ret, ok := s.gBots.Load(r.Event().User)
+	if !ok {
+		// ret = NewGitHubIssueBot(r.Contect(), TODO: DISK )
+		// s.gBots.Store(r.Event().User, ret)
+		// TODO if not on disk
+		return nil
+	}
+	return ret.(*GitHubIssueBot)
+}
+
+// SetGBot will create a new user-github association
+func (s *SlackBot) SetGBot(r slacker.Request, token string) *GitHubIssueBot {
+	log.Infof("Setting bot")
+	ret, ok := s.gBots.Load(r.Event().User)
+	if ok {
+		return nil
+	}
+	ret = NewGitHubIssueBot(r.Context(), token)
+	s.gBots.Store(r.Event().User, ret)
+	// TODO DISK
+	return ret.(*GitHubIssueBot)
+}
+
+// DeleteGBot will create a new user-github association
+func (s *SlackBot) DeleteGBot(r slacker.Request) {
+	log.Infof("Deleting bot")
+	s.gBots.Delete(r.Event().User)
+	// TODO DISK
+}
+
+/*************
+* The following are command definitions
+*************/
 
 // createNewIssue is the callback containing logic for "new" command on Slack.
 func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
@@ -84,7 +120,11 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	subCtx, cancel := context.WithTimeout(r.Context(), time.Second*TimeoutSeconds)
 	defer cancel()
 
-	issue, err := s.gBot.NewIssue(subCtx, repo, title, body)
+	client := s.GetGBot(r)
+	if !s.CheckClient(w, client) { // TODO: This could be in auth
+		return
+	}
+	issue, err := client.NewIssue(subCtx, repo, title, body)
 	if err != nil || subCtx.Err() != nil {
 		if err != nil {
 			w.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
@@ -102,26 +142,29 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	return
 }
 
+/*************
+* The following are initializers
+*************/
+
 // newSlackBot BotLink and Slacker (bot) type, and calls Slacker.Listen
-func newSlackBot(token string, authedUsers []string, gBot *GitHubIssueBot) *SlackBot {
+func newSlackBot(token string, authedUsers []string) *SlackBot {
 
 	slackBot := &SlackBot{
 		sBot:    slacker.NewClient(token),
-		gBot:    gBot,
 		wg:      &sync.WaitGroup{},
 		running: false,
 	}
 
 	newIssue := &slacker.CommandDefinition{
-		Description:           fmt.Sprintf("Creates a new issue on github for %v/YOUR_REPO", gBot.GetOrg()),
+		Description:           fmt.Sprintf("Creates a new issue on github for repo specified"),
 		Example:               `new "repo" "issue title" "issue body"`,
-		AuthorizationRequired: true,
-		AuthorizedUsers:       authedUsers,
+		AuthorizationRequired: false,
+		AuthorizedUsers:       authedUsers, // TODO: we can do custom parser and everything now
 		Handler:               slackBot.createNewIssue,
 	}
 
 	// Register command
-	slackBot.sBot.Command("new <all>", newIssue)
+	slackBot.sBot.Command("new <all>", newIssue) // TODO: we can make this legit and then NOT USE IT
 
 	return slackBot
 }
@@ -131,6 +174,18 @@ func (s *SlackBot) Listen(ctx context.Context) error {
 	s.running = true
 	err := s.sBot.Listen(ctx)
 	return trace.Wrap(err)
+}
+
+/*************
+* The following are helper functions and often write directly to slack
+*************/
+
+func (s *SlackBot) CheckClient(w slacker.ResponseWriter, client *GitHubIssueBot) bool {
+	if client != nil {
+		return true
+	}
+	w.ReportError(errors.New("You must register first, see `help` command"))
+	return false
 }
 
 // EmptyQueue is called to stop slack commands from starting and locking the program into running.

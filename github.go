@@ -52,7 +52,7 @@ type GitHubIssueBot struct {
 	org        string
 }
 
-// NOTE: The following two declerations are used to enable "preview mode" in github v4 API.
+// NOTE: The following two declarations are used to enable "preview mode" in github v4 API.
 
 // Transport is a oauth2.Transport wrapper (an http.Transport wrapper itself)
 // enabling us to add headers to all requests.
