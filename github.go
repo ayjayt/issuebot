@@ -2,12 +2,18 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gravitational/trace"
 	"github.com/mailgun/log"
 	"github.com/shurcooL/githubv4" // Serious concern that v4 is an inferior choice to v3
 	"golang.org/x/oauth2"
+)
+
+var (
+	ErrBadRepo = errors.New("poorly formatted repo name")
 )
 
 // Issue structure represents a GitHub issue object and a portion of fields available.
@@ -49,7 +55,6 @@ type GitHubIssueBot struct {
 	client     *githubv4.Client
 	httpClient *http.Client
 	token      string
-	org        string
 }
 
 // NOTE: The following two declarations are used to enable "preview mode" in github v4 API.
@@ -94,53 +99,35 @@ func (g *GitHubIssueBot) Connect(ctx context.Context) {
 	return
 }
 
-// SetToken is just a setter for the private token member of the type.
-func (g *GitHubIssueBot) SetToken(token string) {
-	g.token = token
-}
+// CheckToken finds the full name of an organization based off the "URL" name.
+func (g *GitHubIssueBot) CheckToken(ctx context.Context) (name string, login string, err error) {
 
-// GetOrg is a getter for the specified organziation's full name.
-func (g *GitHubIssueBot) GetOrg() string {
-	return g.org
-}
-
-// CheckOrg finds the full name of an organization based off the "URL" name.
-func (g *GitHubIssueBot) CheckOrg(ctx context.Context, org string) error {
-
-	variables := map[string]interface{}{
-		"org": githubv4.String(org),
-	}
-
-	var queryUser struct { // TODO: use Search object + type, not User/Org object
-		User struct {
-			Name string
-		} `graphql:"user(login: $org)"`
-	}
-
-	var queryOrg struct {
-		Organization struct {
-			Name string
-		} `graphql:"organization(login: $org)"`
-	}
-
-	// TODO: This logic will simplify when TODO above is addressed
-	if err := g.client.Query(ctx, &queryUser, variables); err != nil {
-		// Try a different query before returning err...
-		if err = g.client.Query(ctx, &queryOrg, variables); err != nil {
-			return trace.Wrap(err)
+	var query struct {
+		Viewer struct {
+			Login string
+			Name  string
 		}
 	}
-	g.org = org
-	return nil
+
+	// Try a different query before returning err...
+	err = g.client.Query(ctx, &query, nil)
+	if err != nil {
+		return "", "", trace.Wrap(err)
+	}
+	return query.Viewer.Name, query.Viewer.Login, nil
 }
 
 // NewIssue takes a repo, issue, and issueBody and then creates a new issue.
 func (g *GitHubIssueBot) NewIssue(ctx context.Context, repo string, title string, body string) (*Issue, error) {
-
+	repoPath := strings.Split(repo, "/")
+	if len(repoPath) != 2 {
+		// TODO: check channel for reponame
+		return nil, ErrBadRepo
+	}
 	// We need to see if the repo exists first. Search would still be better.
 	variables := map[string]interface{}{
-		"org":  githubv4.String(g.org),
-		"repo": githubv4.String(repo),
+		"org":  githubv4.String(repoPath[0]),
+		"repo": githubv4.String(repoPath[1]),
 	}
 
 	var query struct {

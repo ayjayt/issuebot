@@ -55,7 +55,7 @@ func init() {
 type SlackBot struct {
 	sBot  *slacker.Slacker
 	gBots sync.Map
-	//gBots   map[string]*GitHubIssueBot // Should this be a sync map
+	// TODO: default gBot based on token
 	wg      *sync.WaitGroup
 	running bool
 }
@@ -91,7 +91,7 @@ func (s *SlackBot) SetGBot(r slacker.Request, gBot *GitHubIssueBot) bool {
 
 // DeleteGBot will create a new user-github association
 func (s *SlackBot) DeleteGBot(r slacker.Request) {
-	log.Infof("Deleting bot")
+	log.Infof("Deleting bot") // all log ettiquette
 	s.gBots.Delete(r.Event().User)
 	// TODO DISK
 }
@@ -111,7 +111,7 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	repo, title, body, err := parseParams(allParams)
 	if err != nil {
 		// This is strictly a user error so log it as info
-		log.Infof("Slackbot command user error: %v", err)
+		log.Infof(err)
 		w.ReportError(errors.New("You must specify repo, title, and body for new issue! All in quotes."))
 		return
 	}
@@ -127,12 +127,12 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	if err != nil || subCtx.Err() != nil {
 		if err != nil {
 			w.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
-			log.Infof("Error with gBot.NewIssue: %v", err)
+			log.Infof(err)
 			log.Infof(trace.DebugReport(err))
 		}
 		if subCtx.Err() != nil {
 			w.ReportError(errors.New("Your request timed out"))
-			log.Infof("Error with gBot.NewIssue: %v", subCtx.Err())
+			log.Infof(subCtx.Err())
 			log.Infof(trace.DebugReport(subCtx.Err()))
 		}
 		return
@@ -155,7 +155,9 @@ func (s *SlackBot) registerUser(r slacker.Request, w slacker.ResponseWriter) {
 	gBot := NewGitHubIssueBot(r.Context(), token) // TODO: is this context... the global context?
 	subCtx, cancel := context.WithTimeout(r.Context(), time.Second*TimeoutSeconds)
 	defer cancel()
-	if err := gBot.CheckOrg(subCtx, "ayjayt"); err != nil {
+
+	name, login, err := gBot.CheckToken(subCtx)
+	if err != nil {
 		w.ReportError(errors.New("Token didn't work"))
 		return
 	} // TODO: find a better function
@@ -164,7 +166,7 @@ func (s *SlackBot) registerUser(r slacker.Request, w slacker.ResponseWriter) {
 		w.ReportError(errors.New("User already registered, please delete first."))
 		return
 	}
-	w.Reply("User successfully register")
+	w.Reply(fmt.Sprintf("User successfully registered: %v, %v", name, login))
 	return
 }
 

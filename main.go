@@ -25,10 +25,6 @@ func run(ctx context.Context) error {
 		return trace.Wrap(err)
 	}
 
-	/*if err := gitHubBot.CheckOrg(ctx, cfg.org); err != nil {
-		return trace.Wrap(err)
-	} // BECOMING OBSOLETE */
-
 	slackBot := newSlackBot(cfg.slackToken, cfg.authedUsers)
 
 	slackBotErr := make(chan error)
