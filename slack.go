@@ -78,16 +78,15 @@ func (s *SlackBot) GetGBot(r slacker.Request) *GitHubIssueBot {
 }
 
 // SetGBot will create a new user-github association
-func (s *SlackBot) SetGBot(r slacker.Request, token string) *GitHubIssueBot {
+func (s *SlackBot) SetGBot(r slacker.Request, gBot *GitHubIssueBot) bool {
 	log.Infof("Setting bot")
-	ret, ok := s.gBots.Load(r.Event().User)
+	_, ok := s.gBots.Load(r.Event().User)
 	if ok {
-		return nil
+		return !ok
 	}
-	ret = NewGitHubIssueBot(r.Context(), token)
-	s.gBots.Store(r.Event().User, ret)
+	s.gBots.Store(r.Event().User, gBot)
 	// TODO DISK
-	return ret.(*GitHubIssueBot)
+	return true
 }
 
 // DeleteGBot will create a new user-github association
@@ -124,7 +123,7 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	if !s.CheckClient(w, client) { // TODO: This could be in auth
 		return
 	}
-	issue, err := client.NewIssue(subCtx, repo, title, body)
+	issue, err := client.NewIssue(subCtx, repo, title, body) // TODO: you'll panic if they delete while doing this
 	if err != nil || subCtx.Err() != nil {
 		if err != nil {
 			w.ReportError(errors.New("There was an error with the GitHub interface... Check 1) the repo name 2) the logs"))
@@ -139,6 +138,33 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 		return
 	}
 	w.Reply(issue.Url)
+	return
+}
+
+func (s *SlackBot) registerUser(r slacker.Request, w slacker.ResponseWriter) {
+	if s.CheckRun(w) {
+		defer s.Done()
+	} else {
+		return
+	}
+	token := r.StringParam("token", "")
+	if token == "" {
+		w.ReportError(errors.New("You must specify a token"))
+		return
+	}
+	gBot := NewGitHubIssueBot(r.Context(), token) // TODO: is this context... the global context?
+	subCtx, cancel := context.WithTimeout(r.Context(), time.Second*TimeoutSeconds)
+	defer cancel()
+	if err := gBot.CheckOrg(subCtx, "ayjayt"); err != nil {
+		w.ReportError(errors.New("Token didn't work"))
+		return
+	} // TODO: find a better function
+	ok := s.SetGBot(r, gBot)
+	if !ok {
+		w.ReportError(errors.New("User already registered, please delete first."))
+		return
+	}
+	w.Reply("User successfully register")
 	return
 }
 
@@ -162,8 +188,14 @@ func newSlackBot(token string, authedUsers []string) *SlackBot {
 		AuthorizedUsers:       authedUsers, // TODO: we can do custom parser and everything now
 		Handler:               slackBot.createNewIssue,
 	}
+	registerUser := &slacker.CommandDefinition{
+		Description:           "Associate a github token with a user",
+		AuthorizationRequired: false,
+		Handler:               slackBot.registerUser,
+	}
 
 	// Register command
+	slackBot.sBot.Command("register <token>", registerUser)
 	slackBot.sBot.Command("new <all>", newIssue) // TODO: we can make this legit and then NOT USE IT
 
 	return slackBot
