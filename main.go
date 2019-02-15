@@ -30,10 +30,11 @@ func run(ctx context.Context) error {
 		return err
 	}
 
+	slackBot := newSlackBot(cfg.slackToken, cfg.authedUsers, gitHubBot)
+
 	slackBotErr := make(chan error)
 	go func() {
-		// NOTE: No need for returned botLink, but I'm sure it will be useful
-		if _, err := slackBotHelper(ctx, cfg.slackToken, cfg.authedUsers, gitHubBot); err != nil {
+		if err := slackBot.Listen(ctx); err != nil {
 			if err != context.Canceled {
 				slackBotErr <- trace.Wrap(err)
 			}
@@ -47,7 +48,7 @@ func run(ctx context.Context) error {
 	select {
 	case <-signalChannel:
 		log.Infof("Received interrupt signal")
-		// TODO: Healthy exit
+		slackBot.EmptyQueue()
 	case <-ctx.Done():
 		// NOTE: context.CancelFunc is a hard kill, it won't acheive the goals of running/WaitGroup
 	case err := <-slackBotErr:
@@ -57,7 +58,6 @@ func run(ctx context.Context) error {
 }
 
 func main() {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

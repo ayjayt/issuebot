@@ -10,11 +10,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// IssuePoster is an interface to shim over GitHubBot while testing.
-type IssuePoster interface {
-	NewIssue(context.Context, string, string, string) (*Issue, error)
-}
-
 // Issue structure represents a GitHub issue object and a portion of fields available.
 // NOTE: This structure is declared by GitHub.com
 type Issue struct {

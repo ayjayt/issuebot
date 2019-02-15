@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/ayjayt/slacker"
@@ -35,16 +36,18 @@ func init() {
 	escapeRegex = regexp.MustCompile(`\\(.)`)
 }
 
+// SlackBot is a wrapper for the underlying slackbot to include some important variabales
+type SlackBot struct {
+	sBot    *slacker.Slacker
+	gBot    *GitHubIssueBot
+	wg      *sync.WaitGroup
+	running bool
+}
+
 // TODO: It would be superior if the pkg slacker had
 // a) custom auth
 // b) a better parser
 // c) custom usage
-
-// BotLink describes a relationship between two persistent API connections.
-type BotLink struct {
-	sBot *slacker.Slacker // TODO: Maybe a CommandRecevier interface?
-	gBot IssuePoster
-}
 
 // paraseParams parses an argument string into three quoted strings.
 // NOTE: The built-in parser only delimits by space, which isn't sufficient.
@@ -63,8 +66,12 @@ func parseParams(monoParam string) (repo string, title string, body string, err 
 }
 
 // createNewIssue is the callback containing logic for "new" command on Slack.
-func (s *BotLink) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
-
+func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
+	if s.CheckRun(w) {
+		defer s.Done()
+	} else {
+		return
+	}
 	allParams := r.StringParam("all", "")
 	repo, title, body, err := parseParams(allParams)
 	if err != nil {
@@ -95,12 +102,14 @@ func (s *BotLink) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 	return
 }
 
-// slackBotHelper defines a BotLink and Slacker (bot) type, and calls Slacker.Listen
-func slackBotHelper(ctx context.Context, token string, authedUsers []string, gBot *GitHubIssueBot) (*BotLink, error) {
+// newSlackBot BotLink and Slacker (bot) type, and calls Slacker.Listen
+func newSlackBot(token string, authedUsers []string, gBot *GitHubIssueBot) *SlackBot {
 
-	botLink := &BotLink{
-		sBot: slacker.NewClient(token),
-		gBot: gBot,
+	slackBot := &SlackBot{
+		sBot:    slacker.NewClient(token),
+		gBot:    gBot,
+		wg:      &sync.WaitGroup{},
+		running: false,
 	}
 
 	newIssue := &slacker.CommandDefinition{
@@ -108,14 +117,45 @@ func slackBotHelper(ctx context.Context, token string, authedUsers []string, gBo
 		Example:               "new \"repo\" \"issue title\" \"issue body\"",
 		AuthorizationRequired: true,
 		AuthorizedUsers:       authedUsers,
-		Handler:               botLink.createNewIssue,
+		Handler:               slackBot.createNewIssue,
 	}
 
 	// Register command
-	botLink.sBot.Command("new <all>", newIssue)
+	slackBot.sBot.Command("new <all>", newIssue)
 
-	err := botLink.sBot.Listen(ctx)
-	return botLink, trace.Wrap(err)
+	return slackBot
+}
+
+// Listen calls Listen on the underlying slackbot
+func (s *SlackBot) Listen(ctx context.Context) error {
+	err := s.sBot.Listen(ctx)
+	s.running = true
+	return trace.Wrap(err)
+}
+
+// EmptyQueue is called to stop slack commands from starting and locking the program into running.
+// Once all commands are done, the waitgroup can be passed.
+func (s *SlackBot) EmptyQueue() {
+	s.running = false
+	s.wg.Wait() // TODO: Add a timeout maybe?
+}
+
+// CheckRun will check to see if you should be using the waitgroup.
+func (s *SlackBot) CheckRun(w slacker.ResponseWriter) bool {
+	if !s.running {
+		w.ReportError(errors.New("I'm shutting down"))
+		return false
+	}
+	s.wg.Add(1)
+	if !s.running {
+		w.ReportError(errors.New("I'm shutting down"))
+		return false
+	}
+	return true
+}
+
+func (s *SlackBot) Done() {
+	s.wg.Done()
 }
 
 // Let's build the regex: https://stackoverflow.com/a/6525975
