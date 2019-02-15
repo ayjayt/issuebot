@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"regexp"
 	"sync"
 	"time"
@@ -14,6 +16,8 @@ import (
 	"github.com/shomali11/proper"
 )
 
+// BUG(AJ) EXPLICITLY CATCH WHEN IT DOESN'T WORK
+
 const (
 	// TimeoutSeconds is how much time Slackbot gives GitHubBot
 	TimeoutSeconds = 8
@@ -22,6 +26,10 @@ const (
 var (
 	// ErrBadParams is returned when user fails to properly format command arguments
 	ErrBadParams = errors.New("user improperly formated command arguments")
+)
+
+const (
+	userTokenFile = "./usertokens"
 )
 
 var (
@@ -39,15 +47,55 @@ func init() {
 
 // SlackBot is a wrapper for the underlying slackbot to include some important variabales
 type SlackBot struct {
-	sBot  *slacker.Slacker
-	gBots sync.Map
+	sBot                *slacker.Slacker
+	gBots               sync.Map          // TODO: By user, maybe a slack user type
+	userTokens          map[string]string // TODO: Protect this against concurrent access
+	userTokensFileLock  sync.Mutex
+	userTokensFileQueue int
 	// TODO: default gBot based on token
 	wg      *sync.WaitGroup
 	running bool
 	botID   string
 }
 
-// newIssueParser takes a whole command and matches and creates three params.
+// readStore finds the file storing tokens and demarshals it into gBots sync.Map
+// TODO: make the a seperate type (any interface with concurrent read write I guess) so it can be easily changed out
+func (s *SlackBot) readStore() error { // should be streaming
+	s.userTokens = make(map[string]string)
+	userTokenFileContents, err := ioutil.ReadFile(userTokenFile)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	err = json.Unmarshal(userTokenFileContents, &s.userTokens)
+	return trace.Wrap(err)
+}
+
+// writeStore finds the file storing tokens and demarshals it into gBots sync.Map
+// TODO: make the a seperate type (any interface with concurrent read write I guess) so it can be easily changed out
+func (s *SlackBot) writeStore() {
+	if s.userTokensFileQueue > 2 {
+		// No need to write that many times
+		return
+	}
+	go func() {
+		s.userTokensFileQueue++
+		s.userTokensFileLock.Lock()
+		userTokenFileContents, err := json.Marshal(s.userTokens)
+		if err != nil {
+			log.Errorf(trace.DebugReport(err))
+			return
+		}
+		err = ioutil.WriteFile(userTokenFile, userTokenFileContents, 0600)
+		if err != nil {
+			log.Errorf(trace.DebugReport(err))
+			return
+		}
+		s.userTokensFileLock.Unlock()
+		s.userTokensFileQueue--
+	}()
+}
+
+// newIssueParser takes a whole command and matches and creates three params. It's a custom parser for one command. TODO: add snippets and default detection
 func (s *SlackBot) newIssueParser(text string) (*proper.Properties, bool) {
 	log.Infof("in newIssueParser for %v with %v", s.botID, text)
 	resultSlice := issueRegex.FindStringSubmatch(text)
@@ -83,22 +131,28 @@ func (s *SlackBot) GetGBot(r slacker.Request) *GitHubIssueBot {
 	log.Infof("Getting bot for : %v", r.Event().User)
 	ret, ok := s.gBots.Load(r.Event().User)
 	if !ok {
-		// ret = NewGitHubIssueBot(r.Contect(), TODO: DISK )
-		// s.gBots.Store(r.Event().User, ret)
-		// TODO if not on disk
-		return nil
+		diskCheck, ok := s.userTokens[r.Event().User] // TODO: write/read concurrency issues. Only one at a time, or mutexes, or a queue.
+		if ok {
+			ret = NewGitHubIssueBot(r.Context(), diskCheck)
+			// TODO: this needs testing
+			s.gBots.Store(r.Event().User, ret)
+		} else {
+			return nil
+		}
 	}
 	return ret.(*GitHubIssueBot)
 }
 
 // SetGBot will create a new user-github association
 func (s *SlackBot) SetGBot(r slacker.Request, gBot *GitHubIssueBot) bool {
+	// TODO: maybe testing should be in here -- definitely
 	_, ok := s.gBots.Load(r.Event().User)
 	if ok {
 		return !ok
 	}
 	s.gBots.Store(r.Event().User, gBot)
-	// TODO DISK
+	s.userTokens[r.Event().User] = gBot.token
+	s.writeStore()
 	return true
 }
 
@@ -106,7 +160,8 @@ func (s *SlackBot) SetGBot(r slacker.Request, gBot *GitHubIssueBot) bool {
 func (s *SlackBot) DeleteGBot(r slacker.Request) {
 	log.Infof("Deleting bot") // TODO: all log ettiquette
 	s.gBots.Delete(r.Event().User)
-	// TODO DISK
+	delete(s.userTokens, r.Event().User)
+	s.writeStore() // TODO: somehow I thought a read-writer would be good for this.
 }
 
 /*************
@@ -150,6 +205,7 @@ func (s *SlackBot) createNewIssue(r slacker.Request, w slacker.ResponseWriter) {
 }
 
 func (s *SlackBot) registerUser(r slacker.Request, w slacker.ResponseWriter) {
+	// BUG(AJ) THIS WILL REPEAT IF YOU DO IT RIGHT AWAY OR SOMETHING EVNE IF THEY FIND YOU
 	if s.CheckRun(w) {
 		defer s.Done()
 	} else {
@@ -201,7 +257,10 @@ func newSlackBot(token string, authedUsers []string) *SlackBot {
 		wg:      &sync.WaitGroup{},
 		running: false,
 	}
-
+	err := slackBot.readStore()
+	if err != nil {
+		log.Errorf(trace.DebugReport(err))
+	}
 	newIssue := &slacker.CommandDefinition{
 		Description:           "Creates a new issue on github for repo specified",
 		Example:               `new "repo" "issue title" "issue body"`,
