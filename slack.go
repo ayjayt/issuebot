@@ -70,7 +70,7 @@ func (s *SlackBot) readStore() error { // should be streaming
 	return trace.Wrap(err)
 }
 
-// writeStore finds the file storing tokens and demarshals it into gBots sync.Map
+// writeStore marshals tokens from gBots sync.Map into a file
 // TODO: make the a seperate type (any interface with concurrent read write I guess) so it can be easily changed out
 func (s *SlackBot) writeStore() {
 	if s.userTokensFileQueue > 2 {
