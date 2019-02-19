@@ -16,7 +16,7 @@ import (
 	"github.com/shomali11/proper"
 )
 
-// BUG(AJ) EXPLICITLY CATCH WHEN IT DOESN'T WORK
+// BUG(AJ) EXPLICITLY CATCH WHEN IT DOESN'T WORK - when what doesn't work? there's bugs... the main bug is that... if register is first command it works
 
 const (
 	// TimeoutSeconds is how much time Slackbot gives GitHubBot
@@ -98,7 +98,7 @@ func (s *SlackBot) writeStore() {
 // newIssueParser takes a whole command and matches and creates three params. It's a custom parser for one command. TODO: add snippets and default detection
 func (s *SlackBot) newIssueParser(text string) (*proper.Properties, bool) {
 	log.Infof("in newIssueParser for %v with %v", s.botID, text)
-	resultSlice := issueRegex.FindStringSubmatch(text)
+	resultSlice := issueRegex.FindStringSubmatch(text) // TODO remove all botnames that aren't quoted before this
 
 	var wordOffset = 0
 	if (len(resultSlice) < 2) || (len(resultSlice[1]) == 0) || (len(resultSlice[2]) == 0) || (len(resultSlice[3]) == 0) {
@@ -111,7 +111,6 @@ func (s *SlackBot) newIssueParser(text string) (*proper.Properties, bool) {
 			wordOffset = 1
 		}
 	}
-
 	getMatch := func(matched string) string { return matched }
 	deEscape := func(escaped string) string { return escapeRegex.ReplaceAllStringFunc(escaped, getMatch) }
 	parameters := make(map[string]string)
