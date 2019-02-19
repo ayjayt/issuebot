@@ -2,7 +2,7 @@
 
 
 [[projects]]
-  branch = "odd_changes"
+  branch = "odd_changes_rebased"
   digest = "1:25b9e8fa9f2e7a67e6a5dfb5d09b13c4505aeda97d1c42c4098e9fbb77f7f8cf"
   name = "github.com/ayjayt/slacker"
   packages = ["."]
